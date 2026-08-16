@@ -5,3 +5,5 @@ python-dotenv
 gitpython
 networkx
 scikit-learn
+numpy
+httpx

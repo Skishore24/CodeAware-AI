@@ -4,13 +4,10 @@ from typing import Any, Dict
 from app.agents.base_agent import BaseAgent
 from app.services.rag_service import RAGService
 from app.ai.reasoner import CodeAwareReasoner
+from app.config.paths import CLONED_REPOSITORIES_DIR
 
 
 class RAGAgent(BaseAgent):
-    """
-    Retrieves relevant repository code and passes
-    it to the CodeAware reasoning layer.
-    """
 
     def __init__(self):
 
@@ -26,7 +23,7 @@ class RAGAgent(BaseAgent):
         self.reasoner = CodeAwareReasoner()
 
     # ---------------------------------------------------------
-    # Run RAG agent
+    # Run
     # ---------------------------------------------------------
 
     def run(
@@ -38,6 +35,10 @@ class RAGAgent(BaseAgent):
             "repository_path"
         )
 
+        repository_name = input_data.get(
+            "repository_name"
+        )
+
         question = input_data.get(
             "question"
         )
@@ -47,30 +48,69 @@ class RAGAgent(BaseAgent):
             8
         )
 
+        # -----------------------------------------------------
+        # Resolve repository name to path
+        # -----------------------------------------------------
+
         if not repository_path:
 
+            if not repository_name:
+
+                return {
+                    "success": False,
+                    "agent": self.name,
+                    "error": (
+                        "repository_name or "
+                        "repository_path is required."
+                    ),
+                }
+
+            repository_path = (
+                CLONED_REPOSITORIES_DIR
+                / repository_name
+            )
+
+        repository_path = Path(
+            repository_path
+        )
+
+        # -----------------------------------------------------
+        # Validate repository
+        # -----------------------------------------------------
+
+        if not repository_path.exists():
+
             return {
+
                 "success": False,
+
                 "agent": self.name,
+
                 "error": (
-                    "repository_path is required."
+                    "Repository does not exist: "
+                    f"{repository_path}"
                 ),
+
             }
 
         if not question:
 
             return {
+
                 "success": False,
+
                 "agent": self.name,
+
                 "error": (
                     "question is required."
                 ),
+
             }
 
         try:
 
             rag_service = RAGService(
-                Path(repository_path)
+                repository_path
             )
 
             retrieval = rag_service.search(
@@ -93,6 +133,10 @@ class RAGAgent(BaseAgent):
                 "success": True,
 
                 "agent": self.name,
+
+                "repository": (
+                    str(repository_path)
+                ),
 
                 "question": question,
 

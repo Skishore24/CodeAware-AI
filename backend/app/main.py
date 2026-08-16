@@ -5,6 +5,7 @@ from app.api.repositories import router as repositories_router
 from app.api.agents import router as agents_router
 from app.api.graph import router as graph_router
 from app.api.rag import router as rag_router
+from app.api.github import router as github_router
 
 app = FastAPI(
     title="CodeAware AI",
@@ -15,7 +16,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,17 +24,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(
-    graph_router
-)
+# ---------------------------------------------------------
+# Register all routers
+# ---------------------------------------------------------
 
-app.include_router(
-    rag_router
-)
+app.include_router(repositories_router)
+app.include_router(agents_router)
+app.include_router(graph_router)
+app.include_router(rag_router)
+app.include_router(github_router)
+
+
+# ---------------------------------------------------------
+# Root
+# ---------------------------------------------------------
 
 @app.get("/")
 def root():
-
     return {
         "name": "CodeAware AI",
         "version": "0.1.0",
@@ -44,17 +50,7 @@ def root():
 
 @app.get("/health")
 def health():
-
     return {
         "status": "healthy",
         "service": "codeaware-backend",
     }
-
-
-app.include_router(
-    repositories_router
-)
-
-app.include_router(
-    agents_router
-)

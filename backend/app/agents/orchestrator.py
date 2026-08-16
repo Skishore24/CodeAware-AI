@@ -15,6 +15,9 @@ from app.agents.rag_agent import (
 from app.ml.intent_classifier import (
     IntentClassifier
 )
+from app.agents.impact_agent import (
+    ImpactAgent
+)
 
 
 class CodeAwareOrchestrator:
@@ -106,6 +109,7 @@ class CodeAwareOrchestrator:
                     input_data
                 )
             )
+
 
         # -----------------------------------------------------
         # Impact analysis

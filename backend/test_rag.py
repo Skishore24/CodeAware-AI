@@ -3,9 +3,11 @@ from pathlib import Path
 from app.rag.chunker import CodeChunker
 
 
-repository_path = Path(
-    r"C:\MyFiles\Project\CODEAWARE\workspace\cloned_repositories\CodeAware-AI"
-)
+from app.config.paths import CLONED_REPOSITORIES_DIR
+
+# Use the first cloned repository or default directory
+repository_path = next(CLONED_REPOSITORIES_DIR.glob("*"), CLONED_REPOSITORIES_DIR)
+
 
 
 print("=" * 60)

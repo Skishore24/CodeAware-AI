@@ -1,8 +1,10 @@
-# Python
+# Python & Bytecode
 __pycache__/
 *.py[cod]
 
-# Virtual environment
+# Virtual environments
+venv/
+.venv/
 backend/venv/
 
 # Environment variables
@@ -12,19 +14,28 @@ backend/.env
 # IDE
 .vscode/
 
-# Data
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.nx/
+
+# Data & Storage
 data/repositories/*
+!data/repositories/.gitkeep
 data/indexes/*
+!data/indexes/.gitkeep
 data/graphs/*
+!data/graphs/.gitkeep
 data/embeddings/*
+!data/embeddings/.gitkeep
 
 # Workspace
 workspace/cloned_repositories/*
+!workspace/cloned_repositories/.gitkeep
 workspace/sandbox/*
+!workspace/sandbox/.gitkeep
 
-# Logs
+# Logs & OS
 *.log
-
-# OS
 .DS_Store
 Thumbs.db
