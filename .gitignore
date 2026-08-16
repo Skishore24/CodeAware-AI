@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+backend/venv/
+
+# Environment variables
+.env
+backend/.env
+
+# IDE
+.vscode/
+
+# Data
+data/repositories/*
+data/indexes/*
+data/graphs/*
+data/embeddings/*
+
+# Workspace
+workspace/cloned_repositories/*
+workspace/sandbox/*
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
