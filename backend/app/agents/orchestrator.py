@@ -1,48 +1,49 @@
 from typing import Any, Dict
 
-from app.agents.repository_agent import (
-    RepositoryAgent
-)
+from app.agents.repository_agent import RepositoryAgent
+from app.agents.code_agent import CodeAgent
+from app.agents.rag_agent import RAGAgent
+from app.agents.impact_agent import ImpactAgent
+from app.agents.bug_agent import BugAgent
+from app.agents.test_agent import TestAgent
+from app.agents.fix_agent import FixAgent
 
-from app.agents.code_agent import (
-    CodeAgent
-)
-
-from app.agents.rag_agent import (
-    RAGAgent
-)
-
-from app.ml.intent_classifier import (
-    IntentClassifier
-)
-from app.agents.impact_agent import (
-    ImpactAgent
-)
+from app.ml.intent_classifier import IntentClassifier
 
 
 class CodeAwareOrchestrator:
+    """
+    Central controller for CodeAware AI.
+
+    Receives a developer task,
+    determines the intent,
+    selects the correct specialist agent,
+    and returns the result.
+    """
 
     def __init__(self):
 
-        self.repository_agent = (
-            RepositoryAgent()
-        )
+        # ---------------------------------------------
+        # Specialist agents
+        # ---------------------------------------------
 
-        self.code_agent = (
-            CodeAgent()
-        )
+        self.repository_agent = RepositoryAgent()
+        self.code_agent = CodeAgent()
+        self.rag_agent = RAGAgent()
+        self.impact_agent = ImpactAgent()
+        self.bug_agent = BugAgent()
+        self.test_agent = TestAgent()
+        self.fix_agent = FixAgent()
 
-        self.rag_agent = (
-            RAGAgent()
-        )
+        # ---------------------------------------------
+        # Intent classifier
+        # ---------------------------------------------
 
-        self.intent_classifier = (
-            IntentClassifier()
-        )
+        self.intent_classifier = IntentClassifier()
 
-    # ---------------------------------------------------------
-    # Run task
-    # ---------------------------------------------------------
+    # =================================================
+    # RUN TASK
+    # =================================================
 
     def run(
         self,
@@ -50,191 +51,164 @@ class CodeAwareOrchestrator:
         input_data: Dict[str, Any]
     ) -> Dict[str, Any]:
 
-        # -----------------------------------------------------
-        # Predict intent
-        # -----------------------------------------------------
+        # ---------------------------------------------
+        # Validate task
+        # ---------------------------------------------
 
-        intent_result = (
-            self.intent_classifier.predict(
-                task
-            )
-        )
+        if not task or not task.strip():
+            return {
+                "success": False,
+                "intent": None,
+                "message": "Task is required."
+            }
 
-        intent = intent_result[
-            "intent"
-        ]
+        # ---------------------------------------------
+        # Make sure input_data is a dictionary
+        # ---------------------------------------------
 
-        # -----------------------------------------------------
-        # Repository analysis
-        # -----------------------------------------------------
+        if input_data is None:
+            input_data = {}
 
-        if intent == "repository_analysis":
+        # ---------------------------------------------
+        # Predict user intent
+        # ---------------------------------------------
 
-            result = (
-                self.repository_agent.run(
-                    input_data
+        try:
+            intent_result = self.intent_classifier.predict(task)
+
+        except Exception as exc:
+            return {
+                "success": False,
+                "intent": None,
+                "message": "Intent classification failed.",
+                "error": str(exc)
+            }
+
+        # ---------------------------------------------
+        # Extract intent
+        # ---------------------------------------------
+
+        intent = intent_result.get("intent")
+        confidence = intent_result.get("confidence", 0.0)
+        alternatives = intent_result.get("alternatives", [])
+
+        # ---------------------------------------------
+        # Execute selected agent
+        # ---------------------------------------------
+
+        try:
+
+            # =========================================
+            # Repository Analysis
+            # =========================================
+
+            if intent == "repository_analysis":
+                result = self.repository_agent.run(input_data)
+
+            # =========================================
+            # Code Search
+            # =========================================
+
+            elif intent == "code_search":
+                result = self.rag_agent.run({**input_data, "question": task})
+
+            # =========================================
+            # Code Explanation
+            # =========================================
+
+            elif intent == "code_explanation":
+                result = self.rag_agent.run({**input_data, "question": task})
+
+            # =========================================
+            # Impact Analysis
+            # =========================================
+
+            elif intent == "impact_analysis":
+                agent_input = {**input_data}
+                symbol = (
+                    agent_input.get("symbol")
+                    or agent_input.get("symbol_name")
                 )
-            )
+                if symbol:
+                    agent_input["symbol"] = symbol
+                result = self.impact_agent.run(agent_input)
 
-        # -----------------------------------------------------
-        # Code search
-        # -----------------------------------------------------
+            # =========================================
+            # Bug Analysis
+            # =========================================
 
-        elif intent == "code_search":
+            elif intent == "bug_analysis":
+                result = self.bug_agent.run(input_data)
 
-            input_data = {
-                **input_data,
-                "question": task,
-            }
+            # =========================================
+            # Security Analysis
+            # =========================================
 
-            result = (
-                self.rag_agent.run(
-                    input_data
-                )
-            )
+            elif intent == "security_analysis":
+                # Security checks are handled by the Bug Agent
+                # (pattern-based detection of unsafe code patterns)
+                result = self.bug_agent.run({
+                    **input_data,
+                    "mode": "security",
+                })
 
-        # -----------------------------------------------------
-        # Code explanation
-        # -----------------------------------------------------
+            # =========================================
+            # Test Generation
+            # =========================================
 
-        elif intent == "code_explanation":
+            elif intent == "test_generation":
+                result = self.test_agent.run(input_data)
 
-            input_data = {
-                **input_data,
-                "question": task,
-            }
+            # =========================================
+            # Fix Request
+            # =========================================
 
-            result = (
-                self.rag_agent.run(
-                    input_data
-                )
-            )
+            elif intent == "fix_request":
+                result = self.fix_agent.run(input_data)
 
+            # =========================================
+            # Documentation
+            # =========================================
 
-        # -----------------------------------------------------
-        # Impact analysis
-        # -----------------------------------------------------
+            elif intent == "documentation":
+                # Use the RAG agent to explain the codebase structure
+                result = self.rag_agent.run({
+                    **input_data,
+                    "question": task,
+                })
 
-        elif intent == "impact_analysis":
+            # =========================================
+            # Unknown Intent
+            # =========================================
 
-            result = {
+            else:
+                result = {
+                    "success": False,
+                    "agent": "Orchestrator",
+                    "message": f"Unknown intent: {intent}"
+                }
+
+        except Exception as exc:
+            return {
                 "success": False,
                 "intent": intent,
-                "message": (
-                    "Impact Agent is the next "
-                    "agent we will implement."
-                ),
+                "intent_confidence": confidence,
+                "intent_alternatives": alternatives,
+                "agent_result": {
+                    "success": False,
+                    "message": "Agent execution failed.",
+                    "error": str(exc)
+                }
             }
 
-        # -----------------------------------------------------
-        # Bug analysis
-        # -----------------------------------------------------
-
-        elif intent == "bug_analysis":
-
-            result = {
-                "success": False,
-                "intent": intent,
-                "message": (
-                    "Bug Agent is the next "
-                    "agent we will implement."
-                ),
-            }
-
-        # -----------------------------------------------------
-        # Security
-        # -----------------------------------------------------
-
-        elif intent == "security_analysis":
-
-            result = {
-                "success": False,
-                "intent": intent,
-                "message": (
-                    "Security Agent is the next "
-                    "agent we will implement."
-                ),
-            }
-
-        # -----------------------------------------------------
-        # Tests
-        # -----------------------------------------------------
-
-        elif intent == "test_generation":
-
-            result = {
-                "success": False,
-                "intent": intent,
-                "message": (
-                    "Test Agent is the next "
-                    "agent we will implement."
-                ),
-            }
-
-        # -----------------------------------------------------
-        # Fix
-        # -----------------------------------------------------
-
-        elif intent == "fix_request":
-
-            result = {
-                "success": False,
-                "intent": intent,
-                "message": (
-                    "Fix Agent is the next "
-                    "agent we will implement."
-                ),
-            }
-
-        # -----------------------------------------------------
-        # Documentation
-        # -----------------------------------------------------
-
-        elif intent == "documentation":
-
-            result = {
-                "success": False,
-                "intent": intent,
-                "message": (
-                    "Documentation Agent is "
-                    "the next agent we will implement."
-                ),
-            }
-
-        else:
-
-            result = {
-                "success": False,
-                "message": (
-                    "Unknown intent."
-                ),
-            }
-
-        # -----------------------------------------------------
-        # Return complete orchestration result
-        # -----------------------------------------------------
+        # ---------------------------------------------
+        # Return complete result
+        # ---------------------------------------------
 
         return {
-
-            "success": result.get(
-                "success",
-                False
-            ),
-
+            "success": result.get("success", False),
             "intent": intent,
-
-            "intent_confidence": (
-                intent_result[
-                    "confidence"
-                ]
-            ),
-
-            "intent_alternatives": (
-                intent_result[
-                    "alternatives"
-                ]
-            ),
-
+            "intent_confidence": confidence,
+            "intent_alternatives": alternatives,
             "agent_result": result,
-
         }

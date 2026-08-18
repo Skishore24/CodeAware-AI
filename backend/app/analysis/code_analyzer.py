@@ -1,3 +1,10 @@
+"""
+Code analysis utilities.
+
+Function and class extraction will be implemented
+in the next stage.
+"""
+
 from pathlib import Path
 from typing import Any, Dict, List
 

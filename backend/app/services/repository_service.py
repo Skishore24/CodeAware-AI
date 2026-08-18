@@ -71,3 +71,28 @@ class RepositoryService:
             "repository_name": repository_name,
             "path": str(destination),
         }
+
+    def list_repositories(self) -> list:
+        """
+        List all cloned repositories in the workspace directory.
+        """
+        repos = []
+        if not self.workspace_dir.exists():
+            return repos
+
+        for item in self.workspace_dir.iterdir():
+            if item.is_dir() and not item.name.startswith("."):
+                # Count files inside
+                try:
+                    file_count = sum(1 for p in item.rglob("*") if p.is_file() and not any(part.startswith(".") for part in p.parts))
+                except Exception:
+                    file_count = 0
+
+                repos.append({
+                    "name": item.name,
+                    "path": str(item.resolve()),
+                    "files_count": file_count,
+                })
+
+        repos.sort(key=lambda r: r["name"].lower())
+        return repos

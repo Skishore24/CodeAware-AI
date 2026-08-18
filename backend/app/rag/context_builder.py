@@ -1,47 +1,155 @@
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 class ContextBuilder:
     """
-    Builds clean context from retrieved code documents.
+    Converts retrieved repository chunks
+    into structured context for the AI reasoner.
     """
+
+    def __init__(
+        self,
+        max_chunks: int = 8,
+        max_characters: int = 24000
+    ):
+
+        self.max_chunks = max_chunks
+
+        self.max_characters = (
+            max_characters
+        )
+
+    # =========================================================
+    # BUILD
+    # =========================================================
 
     def build(
         self,
-        results: List[Dict]
-    ) -> str:
+        results: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
 
         if not results:
-            return "No relevant code was found."
+
+            return {
+                "context": "",
+                "sources": [],
+                "chunk_count": 0
+            }
+
+        selected = results[
+            :self.max_chunks
+        ]
 
         sections = []
 
-        for index, result in enumerate(results, start=1):
+        sources = []
 
-            file_path = result.get(
-                "file",
-                "unknown"
+        total_characters = 0
+
+        for index, item in enumerate(
+            selected,
+            start=1
+        ):
+
+            file_name = (
+                item.get(
+                    "file",
+                    "Unknown"
+                )
             )
 
-            content = result.get(
-                "content",
-                ""
+            content = (
+                item.get(
+                    "content",
+                    ""
+                )
             )
 
-            score = result.get(
-                "retrieval_score",
-                0
+            start_line = (
+                item.get(
+                    "start_line"
+                )
+            )
+
+            end_line = (
+                item.get(
+                    "end_line"
+                )
+            )
+
+            score = (
+                item.get(
+                    "score",
+                    0.0
+                )
             )
 
             section = (
-                f"SOURCE {index}\n"
-                f"FILE: {file_path}\n"
-                f"RELEVANCE: {score:.4f}\n\n"
-                f"```text\n"
+                f"--- SOURCE {index} ---\n"
+                f"File: {file_name}\n"
+                f"Lines: "
+                f"{start_line} - "
+                f"{end_line}\n"
+                f"Score: {score}\n\n"
                 f"{content}\n"
-                f"```"
+                f"--- END SOURCE {index} ---"
             )
 
-            sections.append(section)
+            if (
+                total_characters
+                + len(section)
+                > self.max_characters
+            ):
+                break
 
-        return "\n\n".join(sections)
+            sections.append(
+                section
+            )
+
+            sources.append({
+                "file":
+                    file_name,
+
+                "start_line":
+                    start_line,
+
+                "end_line":
+                    end_line,
+
+                "score":
+                    score
+            })
+
+            total_characters += (
+                len(section)
+            )
+
+        return {
+            "context":
+                "\n\n".join(
+                    sections
+                ),
+
+            "sources":
+                sources,
+
+            "chunk_count":
+                len(sections)
+        }
+
+    # =========================================================
+    # SIMPLE TEXT
+    # =========================================================
+
+    def build_text(
+        self,
+        results
+    ) -> str:
+
+        result = self.build(
+            results
+        )
+
+        return result[
+            "context"
+        ]

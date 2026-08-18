@@ -1,21 +1,38 @@
-# ---------------------------------------------------------
-# settings.py — re-exports from paths.py
-#
-# All path constants are now defined in paths.py.
-# This file exists for backwards-compatibility so that
-# existing imports (from app.config.settings import ...)
-# continue to work without changes.
-# ---------------------------------------------------------
+from pathlib import Path
 
-from app.config.paths import (  # noqa: F401
+from app.config.paths import (
     PROJECT_ROOT,
-    BACKEND_DIR,
+    DATA_DIR,
     WORKSPACE_DIR,
     CLONED_REPOSITORIES_DIR,
     SANDBOX_DIR,
-    DATA_DIR,
-    REPOSITORIES_DIR,
-    INDEXES_DIR,
-    GRAPHS_DIR,
-    EMBEDDINGS_DIR,
 )
+
+
+class Settings:
+    """
+    Central application settings.
+    """
+
+    APP_NAME = "CodeAware AI"
+
+    VERSION = "1.0.0"
+
+    DEBUG = True
+
+    PROJECT_ROOT: Path = PROJECT_ROOT
+
+    DATA_DIR: Path = DATA_DIR
+
+    WORKSPACE_DIR: Path = WORKSPACE_DIR
+
+    CLONED_REPOSITORIES_DIR: Path = (
+        CLONED_REPOSITORIES_DIR
+    )
+
+    SANDBOX_DIR: Path = (
+        SANDBOX_DIR
+    )
+
+
+settings = Settings()

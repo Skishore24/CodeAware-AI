@@ -1,66 +1,58 @@
-import re
-import subprocess
 from pathlib import Path
-from typing import Dict
+import re
+import shutil
+import subprocess
+
+from app.config.paths import CLONED_REPOSITORIES_DIR
 
 
 class GitHubService:
     """
-    Handles GitHub repository cloning.
+    Handles GitHub repository operations.
     """
 
-    def __init__(
-        self,
-        workspace_path: str
-    ):
+    def __init__(self):
+        self.base_directory = CLONED_REPOSITORIES_DIR
 
-        self.workspace_path = Path(
-            workspace_path
+    # =====================================================
+    # REPOSITORY NAME
+    # =====================================================
+
+    def get_repository_name(self, github_url: str) -> str:
+        """
+        Extract repository name from GitHub URL.
+        """
+
+        cleaned_url = github_url.strip().rstrip("/")
+
+        name = cleaned_url.split("/")[-1]
+
+        if name.endswith(".git"):
+            name = name[:-4]
+
+        # Keep only safe filesystem characters
+        name = re.sub(
+            r"[^a-zA-Z0-9_.-]",
+            "_",
+            name
         )
 
-        self.workspace_path.mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        return name
 
-    # ---------------------------------------------------------
-    # Get repository name
-    # ---------------------------------------------------------
+    # =====================================================
+    # VALIDATE URL
+    # =====================================================
 
-    def get_repository_name(
-        self,
-        github_url: str
-    ) -> str:
-
-        url = github_url.strip().rstrip("/")
-
-        if url.endswith(".git"):
-            url = url[:-4]
-
-        match = re.search(
-            r"github\.com/[^/]+/([^/]+)$",
-            url
-        )
-
-        if not match:
-            raise ValueError(
-                "Invalid GitHub repository URL."
-            )
-
-        return match.group(1)
-
-    # ---------------------------------------------------------
-    # Validate URL
-    # ---------------------------------------------------------
-
-    def validate_url(
-        self,
-        github_url: str
-    ) -> bool:
+    def validate_github_url(self, github_url: str) -> bool:
+        """
+        Check whether URL looks like a GitHub repository URL.
+        """
 
         pattern = (
-            r"^https://github\.com/"
-            r"[^/]+/[^/]+(?:\.git)?/?$"
+            r"^https?://github\.com/"
+            r"[^/]+/"
+            r"[^/]+"
+            r"(?:\.git)?/?$"
         )
 
         return bool(
@@ -70,118 +62,133 @@ class GitHubService:
             )
         )
 
-    # ---------------------------------------------------------
-    # Clone repository
-    # ---------------------------------------------------------
+    # =====================================================
+    # CLONE REPOSITORY
+    # =====================================================
 
     def clone_repository(
         self,
         github_url: str
-    ) -> Dict:
+    ) -> dict:
 
         github_url = github_url.strip()
 
-        if not self.validate_url(
-            github_url
-        ):
+        # -------------------------------------------------
+        # Validate URL
+        # -------------------------------------------------
+
+        if not self.validate_github_url(github_url):
+
+            raise ValueError(
+                "Invalid GitHub repository URL."
+            )
+
+        # -------------------------------------------------
+        # Repository name
+        # -------------------------------------------------
+
+        repository_name = (
+            self.get_repository_name(github_url)
+        )
+
+        repository_path = (
+            self.base_directory /
+            repository_name
+        )
+
+        # -------------------------------------------------
+        # Existing repository
+        # -------------------------------------------------
+
+        if repository_path.exists():
 
             return {
-                "success": False,
-                "error": (
-                    "Invalid GitHub URL."
-                )
+                "success": True,
+                "message": (
+                    "Repository already exists."
+                ),
+                "repository_name": repository_name,
+                "repository_path": str(
+                    repository_path
+                ),
+                "already_exists": True,
             }
+
+        # -------------------------------------------------
+        # Clone
+        # -------------------------------------------------
+
+        command = [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            github_url,
+            str(repository_path),
+        ]
 
         try:
 
-            repository_name = (
-                self.get_repository_name(
-                    github_url
-                )
-            )
-
-            repository_path = (
-                self.workspace_path
-                / repository_name
-            )
-
-            # Already cloned
-            if repository_path.exists():
-
-                return {
-                    "success": True,
-                    "message": (
-                        "Repository already exists."
-                    ),
-                    "repository_name": (
-                        repository_name
-                    ),
-                    "repository_path": str(
-                        repository_path.resolve()
-                    ),
-                    "already_exists": True,
-                }
-
-            # Clone
             result = subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    github_url,
-                    str(repository_path),
-                ],
+                command,
                 capture_output=True,
                 text=True,
                 timeout=300,
             )
 
-            if result.returncode != 0:
-
-                return {
-                    "success": False,
-                    "error": (
-                        result.stderr.strip()
-                        or "Git clone failed."
-                    ),
-                }
-
-            return {
-                "success": True,
-                "message": (
-                    "Repository cloned successfully."
-                ),
-                "repository_name": (
-                    repository_name
-                ),
-                "repository_path": str(
-                    repository_path.resolve()
-                ),
-                "already_exists": False,
-            }
-
         except FileNotFoundError:
 
-            return {
-                "success": False,
-                "error": (
-                    "Git was not found. "
-                    "Make sure Git is installed "
-                    "and available in PATH."
-                ),
-            }
+            raise RuntimeError(
+                "Git is not installed or not available "
+                "in PATH."
+            )
 
         except subprocess.TimeoutExpired:
 
-            return {
-                "success": False,
-                "error": (
-                    "Git clone timed out."
-                ),
-            }
+            # Remove incomplete repository
+            if repository_path.exists():
+                shutil.rmtree(
+                    repository_path,
+                    ignore_errors=True
+                )
 
-        except Exception as exc:
+            raise RuntimeError(
+                "Git clone timed out."
+            )
 
-            return {
-                "success": False,
-                "error": str(exc),
-            }
+        # -------------------------------------------------
+        # Clone failed
+        # -------------------------------------------------
+
+        if result.returncode != 0:
+
+            if repository_path.exists():
+                shutil.rmtree(
+                    repository_path,
+                    ignore_errors=True
+                )
+
+            error_message = (
+                result.stderr.strip()
+                or "Git clone failed."
+            )
+
+            raise RuntimeError(
+                error_message
+            )
+
+        # -------------------------------------------------
+        # Success
+        # -------------------------------------------------
+
+        return {
+            "success": True,
+            "message": (
+                "Repository cloned successfully."
+            ),
+            "repository_name": repository_name,
+            "repository_path": str(
+                repository_path
+            ),
+            "already_exists": False,
+        }

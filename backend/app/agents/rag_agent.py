@@ -109,13 +109,12 @@ class RAGAgent(BaseAgent):
 
         try:
 
-            rag_service = RAGService(
-                repository_path
-            )
+            rag_service = RAGService()
 
             retrieval = rag_service.search(
+                repository_path=str(repository_path),
                 query=question,
-                top_k=top_k
+                top_k=top_k,
             )
 
             context = retrieval.get(

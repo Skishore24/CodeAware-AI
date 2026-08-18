@@ -1,16 +1,16 @@
 from pathlib import Path
-from collections import Counter
+from typing import Any, Dict, List
 
 
 class RepositoryScanner:
     """
     Scans a cloned repository and collects
-    basic repository information.
+    structural information.
     """
 
-    # ---------------------------------------------------------
-    # Files that should NOT be analyzed
-    # ---------------------------------------------------------
+    # =====================================================
+    # FILES WE DON'T WANT TO ANALYZE
+    # =====================================================
 
     IGNORED_DIRECTORIES = {
         ".git",
@@ -24,163 +24,114 @@ class RepositoryScanner:
         "dist",
         "build",
         "coverage",
-        ".next",
-        ".cache",
+        ".pytest_cache",
     }
 
-    # ---------------------------------------------------------
-    # File extension → language
-    # ---------------------------------------------------------
+    # =====================================================
+    # EXTENSIONS
+    # =====================================================
 
-    LANGUAGE_MAP = {
+    LANGUAGE_EXTENSIONS = {
+
         ".py": "Python",
+
         ".js": "JavaScript",
+
         ".jsx": "JavaScript",
+
         ".ts": "TypeScript",
+
         ".tsx": "TypeScript",
+
         ".java": "Java",
-        ".cpp": "C++",
-        ".cc": "C++",
+
         ".c": "C",
+
+        ".cpp": "C++",
+
+        ".cc": "C++",
+
         ".h": "C/C++",
-        ".cs": "C#",
+
+        ".hpp": "C++",
+
         ".go": "Go",
+
         ".rs": "Rust",
+
         ".php": "PHP",
+
         ".rb": "Ruby",
+
+        ".cs": "C#",
+
         ".swift": "Swift",
+
         ".kt": "Kotlin",
-        ".html": "HTML",
-        ".css": "CSS",
-        ".scss": "SCSS",
-        ".json": "JSON",
-        ".xml": "XML",
-        ".yaml": "YAML",
-        ".yml": "YAML",
+
         ".sql": "SQL",
+
+        ".html": "HTML",
+
+        ".css": "CSS",
+
+        ".scss": "SCSS",
+
+        ".json": "JSON",
+
+        ".yaml": "YAML",
+
+        ".yml": "YAML",
+
+        ".xml": "XML",
+
         ".md": "Markdown",
-        ".sh": "Shell",
-        ".bat": "Batch",
+
     }
 
-    # ---------------------------------------------------------
-    # Constructor
-    # ---------------------------------------------------------
+    # =====================================================
+    # IMPORTANT FILES
+    # =====================================================
 
-    def __init__(self, repository_path: Path):
-        self.repository_path = Path(repository_path)
+    IMPORTANT_FILES = {
+        "README.md",
+        "README.txt",
+        "README",
+        "requirements.txt",
+        "package.json",
+        "package-lock.json",
+        "yarn.lock",
+        "pyproject.toml",
+        "setup.py",
+        "Dockerfile",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        ".env.example",
+        ".gitignore",
+    }
 
-    # ---------------------------------------------------------
-    # Check whether directory should be ignored
-    # ---------------------------------------------------------
+    # =====================================================
+    # INITIALIZE
+    # =====================================================
 
-    def should_ignore(self, path: Path) -> bool:
+    def __init__(
+        self,
+        repository_path: Path
+    ):
 
-        return any(
-            part in self.IGNORED_DIRECTORIES
-            for part in path.parts
+        self.repository_path = Path(
+            repository_path
         )
 
-    # ---------------------------------------------------------
-    # Get all repository files
-    # ---------------------------------------------------------
+    # =====================================================
+    # PUBLIC SCAN METHOD
+    # =====================================================
 
-    def get_files(self):
+    def scan(self) -> Dict[str, Any]:
 
-        files = []
-
-        for path in self.repository_path.rglob("*"):
-
-            if not path.is_file():
-                continue
-
-            if self.should_ignore(path):
-                continue
-
-            files.append(path)
-
-        return files
-
-    # ---------------------------------------------------------
-    # Detect language
-    # ---------------------------------------------------------
-
-    def detect_language(self, file_path: Path):
-
-        extension = file_path.suffix.lower()
-
-        return self.LANGUAGE_MAP.get(
-            extension,
-            "Other"
-        )
-
-    # ---------------------------------------------------------
-    # Count lines
-    # ---------------------------------------------------------
-
-    def count_lines(self, file_path: Path):
-
-        try:
-
-            with open(
-                file_path,
-                "r",
-                encoding="utf-8",
-                errors="ignore"
-            ) as file:
-
-                return sum(
-                    1 for _ in file
-                )
-
-        except Exception:
-
-            return 0
-
-    # ---------------------------------------------------------
-    # Detect important files
-    # ---------------------------------------------------------
-
-    def detect_project_files(self, files):
-
-        file_names = {
-            file.name.lower()
-            for file in files
-        }
-
-        return {
-
-            "has_readme": any(
-                name.startswith("readme")
-                for name in file_names
-            ),
-
-            "has_requirements": (
-                "requirements.txt" in file_names
-            ),
-
-            "has_package_json": (
-                "package.json" in file_names
-            ),
-
-            "has_dockerfile": (
-                "dockerfile" in file_names
-            ),
-
-            "has_gitignore": (
-                ".gitignore" in file_names
-            ),
-
-            "has_env_file": (
-                ".env" in file_names
-            ),
-        }
-
-    # ---------------------------------------------------------
-    # Main scanner
-    # ---------------------------------------------------------
-
-    def scan(self):
+        # -------------------------------------------------
+        # Validate repository
+        # -------------------------------------------------
 
         if not self.repository_path.exists():
 
@@ -189,53 +140,125 @@ class RepositoryScanner:
                 f"{self.repository_path}"
             )
 
-        files = self.get_files()
+        if not self.repository_path.is_dir():
 
-        language_counter = Counter()
-
-        total_lines = 0
-
-        file_details = []
-
-        for file_path in files:
-
-            language = self.detect_language(
-                file_path
+            raise ValueError(
+                "Repository path is not a directory."
             )
 
-            lines = self.count_lines(
-                file_path
+        # -------------------------------------------------
+        # Collect files
+        # -------------------------------------------------
+
+        files: List[Dict[str, Any]] = []
+
+        language_counts: Dict[str, int] = {}
+
+        total_size = 0
+
+        for file_path in self._iter_files():
+
+            relative_path = (
+                file_path.relative_to(
+                    self.repository_path
+                )
             )
 
-            language_counter[language] += 1
-
-            total_lines += lines
-
-            relative_path = file_path.relative_to(
-                self.repository_path
+            extension = (
+                file_path.suffix.lower()
             )
 
-            file_details.append({
+            language = (
+                self.LANGUAGE_EXTENSIONS.get(
+                    extension,
+                    "Unknown"
+                )
+            )
 
-                "path": str(relative_path),
+            try:
 
-                "name": file_path.name,
+                size = (
+                    file_path.stat().st_size
+                )
 
-                "extension": file_path.suffix,
+            except OSError:
 
-                "language": language,
+                size = 0
 
-                "lines": lines,
+            total_size += size
 
-            })
+            language_counts[language] = (
+                language_counts.get(
+                    language,
+                    0
+                ) + 1
+            )
 
-        project_files = self.detect_project_files(
-            files
+            files.append(
+                {
+                    "path": str(
+                        relative_path
+                    ),
+                    "name": file_path.name,
+                    "extension": extension,
+                    "language": language,
+                    "size_bytes": size,
+                }
+            )
+
+        # -------------------------------------------------
+        # Important files
+        # -------------------------------------------------
+
+        important_files = []
+
+        for file in files:
+
+            if file["name"] in (
+                self.IMPORTANT_FILES
+            ):
+
+                important_files.append(
+                    file["path"]
+                )
+
+        # -------------------------------------------------
+        # Directories
+        # -------------------------------------------------
+
+        directories = []
+
+        for directory in self._iter_directories():
+
+            relative_path = (
+                directory.relative_to(
+                    self.repository_path
+                )
+            )
+
+            directories.append(
+                str(relative_path)
+            )
+
+        # -------------------------------------------------
+        # Detect project type
+        # -------------------------------------------------
+
+        project_types = (
+            self._detect_project_types(
+                files
+            )
         )
+
+        # -------------------------------------------------
+        # Return result
+        # -------------------------------------------------
 
         return {
 
-            "repository_name": (
+            "success": True,
+
+            "repository": (
                 self.repository_path.name
             ),
 
@@ -243,16 +266,201 @@ class RepositoryScanner:
                 self.repository_path
             ),
 
-            "total_files": len(files),
+            "summary": {
 
-            "total_lines": total_lines,
+                "total_files": len(
+                    files
+                ),
 
-            "languages": dict(
-                language_counter
+                "total_directories": len(
+                    directories
+                ),
+
+                "total_size_bytes": (
+                    total_size
+                ),
+
+                "languages": (
+                    language_counts
+                ),
+
+            },
+
+            "project_types": (
+                project_types
             ),
 
-            "project_files": project_files,
+            "important_files": (
+                important_files
+            ),
 
-            "files": file_details,
+            "directories": (
+                directories
+            ),
+
+            "files": files,
 
         }
+
+    # =====================================================
+    # FILE ITERATOR
+    # =====================================================
+
+    def _iter_files(self):
+
+        for path in self.repository_path.rglob("*"):
+
+            if not path.is_file():
+                continue
+
+            if self._is_ignored(path):
+                continue
+
+            yield path
+
+    # =====================================================
+    # DIRECTORY ITERATOR
+    # =====================================================
+
+    def _iter_directories(self):
+
+        for path in self.repository_path.rglob("*"):
+
+            if not path.is_dir():
+                continue
+
+            if self._is_ignored(path):
+                continue
+
+            yield path
+
+    # =====================================================
+    # IGNORE CHECK
+    # =====================================================
+
+    def _is_ignored(
+        self,
+        path: Path
+    ) -> bool:
+
+        try:
+
+            relative = (
+                path.relative_to(
+                    self.repository_path
+                )
+            )
+
+        except ValueError:
+
+            return True
+
+        for part in relative.parts:
+
+            if part in self.IGNORED_DIRECTORIES:
+
+                return True
+
+        return False
+
+    # =====================================================
+    # PROJECT TYPE DETECTION
+    # =====================================================
+
+    def _detect_project_types(
+        self,
+        files: List[Dict[str, Any]]
+    ) -> List[str]:
+
+        names = {
+            file["name"]
+            for file in files
+        }
+
+        extensions = {
+            file["extension"]
+            for file in files
+        }
+
+        project_types = []
+
+        # -------------------------------------------------
+        # Python
+        # -------------------------------------------------
+
+        if (
+            "requirements.txt" in names
+            or "pyproject.toml" in names
+            or ".py" in extensions
+        ):
+
+            project_types.append(
+                "Python"
+            )
+
+        # -------------------------------------------------
+        # Node / React
+        # -------------------------------------------------
+
+        if "package.json" in names:
+
+            project_types.append(
+                "Node.js"
+            )
+
+        if (
+            ".jsx" in extensions
+            or ".tsx" in extensions
+        ):
+
+            project_types.append(
+                "React"
+            )
+
+        # -------------------------------------------------
+        # Java
+        # -------------------------------------------------
+
+        if ".java" in extensions:
+
+            project_types.append(
+                "Java"
+            )
+
+        # -------------------------------------------------
+        # Go
+        # -------------------------------------------------
+
+        if ".go" in extensions:
+
+            project_types.append(
+                "Go"
+            )
+
+        # -------------------------------------------------
+        # Rust
+        # -------------------------------------------------
+
+        if ".rs" in extensions:
+
+            project_types.append(
+                "Rust"
+            )
+
+        # -------------------------------------------------
+        # Docker
+        # -------------------------------------------------
+
+        if (
+            "Dockerfile" in names
+            or "docker-compose.yml" in names
+            or "docker-compose.yaml" in names
+        ):
+
+            project_types.append(
+                "Docker"
+            )
+
+        return sorted(
+            set(project_types)
+        )

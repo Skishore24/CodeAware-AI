@@ -1,0 +1,3 @@
+"""
+CodeAware configuration package.
+"""

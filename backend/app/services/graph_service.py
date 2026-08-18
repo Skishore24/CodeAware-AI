@@ -1,77 +1,129 @@
-from pathlib import Path
 from typing import Any, Dict
 
-from app.analysis.code_analyzer import CodeAnalyzer
-from app.graph.code_graph import CodeKnowledgeGraph
-from app.graph.impact_analysis import ImpactAnalyzer
+from app.graph.code_knowledge_graph import (
+    CodeKnowledgeGraph
+)
+
+from app.graph.impact_analyzer import (
+    ImpactAnalyzer
+)
 
 
 class GraphService:
 
-    def __init__(
+    def __init__(self):
+
+        self.graphs = {}
+
+    # =========================================================
+    # GET GRAPH
+    # =========================================================
+
+    def _get_graph(
         self,
-        repository_path: Path
+        repository_path: str
     ):
 
-        self.repository_path = Path(
+        if repository_path not in (
+            self.graphs
+        ):
+
+            graph = (
+                CodeKnowledgeGraph()
+            )
+
+            graph.build(
+                repository_path
+            )
+
+            self.graphs[
+                repository_path
+            ] = graph
+
+        return self.graphs[
+            repository_path
+        ]
+
+    # =========================================================
+    # BUILD
+    # =========================================================
+
+    def build(
+        self,
+        repository_path: str
+    ) -> Dict[str, Any]:
+
+        graph = (
+            CodeKnowledgeGraph()
+        )
+
+        result = graph.build(
             repository_path
         )
 
-    # ---------------------------------------------------------
-    # Build graph
-    # ---------------------------------------------------------
+        self.graphs[
+            repository_path
+        ] = graph
 
-    def build_graph(self):
+        return {
+            "status": "ready",
+            "repository_path":
+                repository_path,
+            **result
+        }
 
-        analyzer = CodeAnalyzer(
-            self.repository_path
+    # =========================================================
+    # SUMMARY
+    # =========================================================
+
+    def summary(
+        self,
+        repository_path: str
+    ) -> Dict[str, Any]:
+
+        graph = self._get_graph(
+            repository_path
         )
-
-        analysis = analyzer.analyze()
-
-        graph = CodeKnowledgeGraph()
-
-        graph.build_from_analysis(
-            analysis
-        )
-
-        return graph
-
-    # ---------------------------------------------------------
-    # Graph summary
-    # ---------------------------------------------------------
-
-    def get_summary(self):
-
-        graph = self.build_graph()
 
         return graph.summary()
 
-    # ---------------------------------------------------------
-    # Full graph
-    # ---------------------------------------------------------
+    # =========================================================
+    # EXPORT
+    # =========================================================
 
-    def get_graph(self):
+    def export(
+        self,
+        repository_path: str
+    ) -> Dict[str, Any]:
 
-        graph = self.build_graph()
+        graph = self._get_graph(
+            repository_path
+        )
 
         return graph.export()
 
-    # ---------------------------------------------------------
-    # Impact analysis
-    # ---------------------------------------------------------
+    # =========================================================
+    # IMPACT
+    # =========================================================
 
-    def get_impact(
+    def impact(
         self,
-        symbol_name: str
+        repository_path: str,
+        symbol: str,
+        depth: int = 3
     ) -> Dict[str, Any]:
 
-        graph = self.build_graph()
-
-        analyzer = ImpactAnalyzer(
-            graph.graph
+        graph = self._get_graph(
+            repository_path
         )
 
-        return analyzer.find_impact(
-            symbol_name
+        analyzer = (
+            ImpactAnalyzer(
+                graph
+            )
+        )
+
+        return analyzer.analyze(
+            symbol=symbol,
+            depth=depth
         )

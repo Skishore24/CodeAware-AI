@@ -1,0 +1,3 @@
+"""
+CodeAware repository analysis package.
+"""

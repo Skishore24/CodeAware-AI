@@ -1,0 +1,3 @@
+"""
+CodeAware AI backend application.
+"""

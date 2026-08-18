@@ -40,14 +40,11 @@ class CodeChunker:
 
     def __init__(
         self,
-        repository_path: Path,
+        repository_path: Path | str | None = None,
         chunk_size: int = 80,
         overlap: int = 15,
     ):
-        self.repository_path = Path(
-            repository_path
-        )
-
+        self.repository_path = Path(repository_path) if repository_path else None
         self.chunk_size = chunk_size
         self.overlap = overlap
 
@@ -147,8 +144,15 @@ class CodeChunker:
     # ---------------------------------------------------------
 
     def chunk_repository(
-        self
+        self,
+        repository_path: Path | str | None = None
     ) -> List[Dict]:
+
+        if repository_path is not None:
+            self.repository_path = Path(repository_path)
+
+        if not self.repository_path:
+            return []
 
         documents = []
 

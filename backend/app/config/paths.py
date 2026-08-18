@@ -1,53 +1,73 @@
 from pathlib import Path
 
 
-# ---------------------------------------------------------
-# Project root directories
-# ---------------------------------------------------------
+# =========================================================
+# PROJECT ROOT
+# =========================================================
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 PROJECT_ROOT = BACKEND_DIR.parent
 
 
-# ---------------------------------------------------------
-# Workspace
-# ---------------------------------------------------------
-
-WORKSPACE_DIR = PROJECT_ROOT / "workspace"
-
-CLONED_REPOSITORIES_DIR = WORKSPACE_DIR / "cloned_repositories"
-
-SANDBOX_DIR = WORKSPACE_DIR / "sandbox"
-
-
-# ---------------------------------------------------------
-# Data storage
-# ---------------------------------------------------------
+# =========================================================
+# DATA DIRECTORIES
+# =========================================================
 
 DATA_DIR = PROJECT_ROOT / "data"
 
-REPOSITORIES_DIR = DATA_DIR / "repositories"
+REPOSITORIES_DATA_DIR = (
+    DATA_DIR / "repositories"
+)
 
-INDEXES_DIR = DATA_DIR / "indexes"
+INDEXES_DIR = (
+    DATA_DIR / "indexes"
+)
 
-GRAPHS_DIR = DATA_DIR / "graphs"
+GRAPHS_DIR = (
+    DATA_DIR / "graphs"
+)
 
-EMBEDDINGS_DIR = DATA_DIR / "embeddings"
+EMBEDDINGS_DIR = (
+    DATA_DIR / "embeddings"
+)
 
 
-# ---------------------------------------------------------
-# Auto-create all required directories
-# ---------------------------------------------------------
+# =========================================================
+# WORKSPACE
+# =========================================================
 
-for _directory in [
-    WORKSPACE_DIR,
-    CLONED_REPOSITORIES_DIR,
-    SANDBOX_DIR,
+WORKSPACE_DIR = (
+    PROJECT_ROOT / "workspace"
+)
+
+CLONED_REPOSITORIES_DIR = (
+    WORKSPACE_DIR / "cloned_repositories"
+)
+
+SANDBOX_DIR = (
+    WORKSPACE_DIR / "sandbox"
+)
+
+
+# =========================================================
+# CREATE DIRECTORIES
+# =========================================================
+
+DIRECTORIES = [
     DATA_DIR,
-    REPOSITORIES_DIR,
+    REPOSITORIES_DATA_DIR,
     INDEXES_DIR,
     GRAPHS_DIR,
     EMBEDDINGS_DIR,
-]:
-    _directory.mkdir(parents=True, exist_ok=True)
+    WORKSPACE_DIR,
+    CLONED_REPOSITORIES_DIR,
+    SANDBOX_DIR,
+]
+
+
+for directory in DIRECTORIES:
+    directory.mkdir(
+        parents=True,
+        exist_ok=True
+    )
