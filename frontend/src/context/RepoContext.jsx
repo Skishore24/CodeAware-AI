@@ -1,18 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { listRepositories } from "../api/repositories";
-
-/**
- * RepoContext
- *
- * Provides a globally shared "active repository" state and lists all
- * cloned repositories detected in the backend workspace.
- */
+import { listRepositories, healthCheck } from "../api/repositories";
 
 const RepoContext = createContext(null);
 
 export function RepoProvider({ children }) {
   const [repositories, setRepositories] = useState([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
+  const [backendStatus, setBackendStatus] = useState("healthy"); // healthy, degraded, offline
+  const [backendHealth, setBackendHealth] = useState(null);
 
   const [activeRepo, setActiveRepoState] = useState(() => {
     try {
@@ -31,14 +26,26 @@ export function RepoProvider({ children }) {
       } else {
         localStorage.removeItem("codeaware_active_repo");
       }
-    } catch {
-      // localStorage not available
-    }
+    } catch {}
   }, []);
 
   const clearRepo = useCallback(() => {
     setActiveRepo(null);
   }, [setActiveRepo]);
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const data = await healthCheck();
+      if (data?.status === "ok" || data?.status === "healthy") {
+        setBackendStatus("healthy");
+        setBackendHealth(data);
+      } else {
+        setBackendStatus("degraded");
+      }
+    } catch {
+      setBackendStatus("offline");
+    }
+  }, []);
 
   const refreshRepositories = useCallback(async () => {
     setLoadingRepos(true);
@@ -47,7 +54,6 @@ export function RepoProvider({ children }) {
       const list = data.repositories || [];
       setRepositories(list);
 
-      // If no active repository is selected yet and repositories exist, auto-select the first one
       setActiveRepoState((current) => {
         if (!current && list.length > 0) {
           const first = list[0];
@@ -66,8 +72,11 @@ export function RepoProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    checkHealth();
     refreshRepositories();
-  }, [refreshRepositories]);
+    const interval = setInterval(checkHealth, 15000);
+    return () => clearInterval(interval);
+  }, [checkHealth, refreshRepositories]);
 
   return (
     <RepoContext.Provider
@@ -77,6 +86,9 @@ export function RepoProvider({ children }) {
         clearRepo,
         repositories,
         loadingRepos,
+        backendStatus,
+        backendHealth,
+        checkHealth,
         refreshRepositories,
       }}
     >

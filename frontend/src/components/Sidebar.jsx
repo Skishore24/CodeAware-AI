@@ -1,136 +1,124 @@
-import { NavLink } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { healthCheck } from "../api/repositories";
-import { useRepo } from "../context/RepoContext";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   FolderGit2,
   Search,
+  CheckCircle2,
   Bot,
+  GitGraph,
+  GitFork,
   Wrench,
-  Network,
-  Brain,
-  Settings,
-  X,
+  FileCode,
+  Sliders,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
+import { useRepo } from "../context/RepoContext";
 
-const NAV_ITEMS = [
-  { to: "/",           icon: LayoutDashboard, label: "Dashboard"      },
-  { to: "/repos",      icon: FolderGit2,      label: "Repositories"  },
-  { to: "/search",     icon: Search,          label: "Code Search"   },
-  { to: "/agent",      icon: Bot,             label: "Agent Chat"    },
-  { to: "/autonomous", icon: Wrench,          label: "Auto Fix"      },
-  { to: "/graph",      icon: Network,         label: "Code Graph"    },
-];
-
-export default function Sidebar() {
-  const [healthy, setHealthy] = useState(null);
-  const { activeRepo, clearRepo } = useRepo();
-
-  useEffect(() => {
-    healthCheck()
-      .then(() => setHealthy(true))
-      .catch(() => setHealthy(false));
-  }, []);
-
-  const statusColor =
-    healthy === null
-      ? "var(--color-yellow)"
-      : healthy
-      ? "var(--color-green)"
-      : "var(--color-red)";
-
-  const statusLabel =
-    healthy === null
-      ? "Checking…"
-      : healthy
-      ? "Backend online"
-      : "Backend offline";
-
-  // Short display name from path or name
-  const repoDisplayName = activeRepo
-    ? activeRepo.name ||
-      activeRepo.path?.split(/[\\/]/).pop() ||
-      "Active Repo"
-    : null;
+export default function Sidebar({ onOpenPalette }) {
+  const navigate = useNavigate();
+  const { activeRepo, backendStatus } = useRepo();
 
   return (
     <aside className="sidebar">
-      {/* Brand */}
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-logo">
-          <div className="sidebar-brand-icon">
-            <Brain size={20} color="#c4b5fd" />
+      {/* Brand Header */}
+      <div className="sidebar-header">
+        <div className="brand-logo">
+          <div className="brand-icon">
+            <Layers size={16} />
           </div>
-          <div>
-            <div className="sidebar-brand-name">CodeAware</div>
-            <div className="sidebar-brand-version">v1.0 · AI</div>
-          </div>
+          <span>CodeAware</span>
         </div>
 
-        {/* Active repo badge */}
-        {repoDisplayName && (
-          <div className="sidebar-repo-badge" title={activeRepo?.path}>
-            <div className="sidebar-repo-badge-label">Active Repo</div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {repoDisplayName}
-              </span>
-              <button
-                onClick={clearRepo}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}
-                title="Clear active repo"
-              >
-                <X size={11} color="var(--color-text-muted)" />
-              </button>
-            </div>
+        {/* Compact Repository Selector */}
+        <div
+          className="repo-selector"
+          onClick={() => navigate("/repos")}
+          title="Click to switch or clone repository"
+        >
+          <div className="repo-selector-info">
+            <span className="repo-selector-name">
+              {activeRepo ? activeRepo.name : "Select Repository"}
+            </span>
+            <span className="repo-selector-meta">
+              {activeRepo ? (activeRepo.files_count ? `${activeRepo.files_count} files` : "Indexed") : "No repository active"}
+            </span>
           </div>
-        )}
+          <ChevronDown size={14} color="#9CA3AF" />
+        </div>
       </div>
 
-      {/* Nav */}
-      <nav className="sidebar-nav">
-        <div className="sidebar-section-label">Navigation</div>
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                "nav-link" + (isActive ? " active" : "")
-              }
-            >
-              <span className="nav-icon">
-                <Icon size={17} />
-              </span>
-              {item.label}
-            </NavLink>
-          );
-        })}
-
-        <div className="sidebar-section-label" style={{ marginTop: 8 }}>System</div>
-        <NavLink
-          to="/settings"
-          className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
-        >
-          <span className="nav-icon">
-            <Settings size={17} />
-          </span>
-          Settings
+      {/* Navigation Sections */}
+      <div className="sidebar-nav">
+        {/* Workspace */}
+        <div className="nav-section-label">Workspace</div>
+        <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`} end>
+          <LayoutDashboard size={16} />
+          <span>Overview</span>
         </NavLink>
-      </nav>
+        <NavLink to="/repos" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <FolderGit2 size={16} />
+          <span>Repositories</span>
+        </NavLink>
+        <NavLink to="/search" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <Search size={16} />
+          <span>Code Search</span>
+        </NavLink>
+        <NavLink to="/review" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <CheckCircle2 size={16} />
+          <span>Code Review</span>
+        </NavLink>
 
-      {/* Footer */}
+        {/* Intelligence */}
+        <div className="nav-section-label">Intelligence</div>
+        <NavLink to="/agent" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <Bot size={16} />
+          <span>Agent Chat</span>
+        </NavLink>
+        <NavLink to="/graph" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <GitGraph size={16} />
+          <span>Knowledge Graph</span>
+        </NavLink>
+        <NavLink to="/impact" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <GitFork size={16} />
+          <span>Impact Analysis</span>
+        </NavLink>
+
+        {/* Automation */}
+        <div className="nav-section-label">Automation</div>
+        <NavLink to="/autonomous" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <Wrench size={16} />
+          <span>Autonomous Fix</span>
+        </NavLink>
+        <NavLink to="/tests" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <FileCode size={16} />
+          <span>Test Generator</span>
+        </NavLink>
+
+        {/* System */}
+        <div className="nav-section-label">System</div>
+        <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <Sliders size={16} />
+          <span>Settings</span>
+        </NavLink>
+      </div>
+
+      {/* Footer Status */}
       <div className="sidebar-footer">
-        <div className="sidebar-status">
-          <span
-            className="status-dot"
-            style={{ background: statusColor, boxShadow: `0 0 6px ${statusColor}` }}
-          />
-          {statusLabel}
+        <div className="status-badge">
+          <span className={`status-dot ${backendStatus}`}></span>
+          <span style={{ fontSize: "12px", color: "#4B5563" }}>
+            Backend {backendStatus === "healthy" ? "Connected" : backendStatus === "degraded" ? "Degraded" : "Offline"}
+          </span>
         </div>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={onOpenPalette}
+          title="Command Palette (Ctrl+K)"
+          style={{ padding: "3px 7px", fontSize: "11px", color: "#6B7280" }}
+        >
+          ⌘K
+        </button>
       </div>
     </aside>
   );

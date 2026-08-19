@@ -9,6 +9,11 @@ from app.api.code_search import router as code_search_router
 from app.api.graph import router as graph_router
 from app.api.agents import router as agents_router
 from app.api.autonomous import router as autonomous_router
+from app.api.security import router as security_router
+from app.api.review import router as review_router
+from app.api.architecture import router as architecture_router
+from app.api.tests import router as tests_router
+from app.api.system import router as system_router
 
 
 # =========================================================
@@ -62,6 +67,11 @@ app.include_router(code_search_router)
 app.include_router(graph_router)
 app.include_router(agents_router)
 app.include_router(autonomous_router)
+app.include_router(security_router)
+app.include_router(review_router)
+app.include_router(architecture_router)
+app.include_router(tests_router)
+app.include_router(system_router)
 
 
 # =========================================================
@@ -86,7 +96,16 @@ def root():
 @app.get("/health")
 def health():
     return {
-        "success": True,
-        "status": "healthy",
+        "status": "ok",
+        "service": "CodeAware AI",
         "version": "1.0.0",
+        "components": {
+            "database": True,
+            "repository_scanner": True,
+            "search": True,
+            "rag": True,
+            "graph": True,
+            "agents": True,
+            "reasoner": True
+        }
     }

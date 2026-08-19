@@ -1,219 +1,129 @@
-# 🧠 CodeAware AI
+# CodeAware AI — Autonomous Code Intelligence Platform
 
-> **Autonomous AI Code Intelligence Platform** — Clone repositories, search code with natural language, visualize dependency knowledge graphs, orchestrate specialist AI agents, and run automated fix workflows from a single interface.
-
----
-
-## ✨ Features & Capabilities
-
-| Module | Feature | Description |
-|---|---|---|
-| 📂 **Repositories** | **Repository Ingestion & Discovery** | Clone any public GitHub repo or auto-detect existing workspace repositories with real-time pipeline tracking (Clone → Scan → Analyze → Index → Graph). |
-| 🔍 **Code Search** | **Hybrid Code Search** | Search your entire codebase using natural language powered by hybrid TF-IDF retrieval and keyword matching. |
-| 🤖 **Agent Chat** | **Specialist AI Orchestrator** | Free-text task classifier routes requests to dedicated agents (Repository, RAG, Bug, Security, Test, Fix, Documentation). |
-| 🕸️ **Code Graph** | **Knowledge Graph & Impact** | Force-directed NetworkX visual canvas and structured tables mapping files, classes, functions, and symbol change impacts. |
-| 🛠️ **Autonomous Fix** | **End-to-End Bug Patching** | AI inspects reported bugs, writes patches, validates syntax, previews side-by-side diffs, commits to branches, and opens GitHub PRs. |
-| ⚙️ **Settings & Context** | **Global State & System Health** | Shared `RepoContext` across all pages with persistence, backend health diagnostics, and repository switching. |
+> **Local-First, Self-Hosted Developer Intelligence** — understand an entire repository, retrieve relevant source code with citations, analyze symbols & dependencies, detect bugs & security vulnerabilities, calculate blast radius, generate unit tests, and propose verified patches through a clean developer workspace.
 
 ---
 
-## 🗂️ Project Structure
+## 🚀 Key Capabilities
 
+- **100% Local-First / Self-Hosted**: Zero reliance on external paid LLM APIs. Uses deterministic AST symbol analysis, static pattern checking, TF-IDF hybrid retrieval, and local reasoning.
+- **15 Standardized Specialist Agents**:
+  1. `RepositoryAgent` — Tech stack, language distribution, file hierarchy & entry points.
+  2. `SearchAgent` — Natural language code search and symbol lookup.
+  3. `RAGAgent` — Repository-aware chunk retrieval with line-number citations.
+  4. `CodeAnalysisAgent` — AST classes, methods, parameters, and call graphs.
+  5. `BugAgent` — Syntax errors, bare excepts, runtime flaws, and unhandled issues.
+  6. `SecurityAgent` — OWASP static security audits (SQLi, hardcoded credentials, command injection, unsafe eval/exec, path traversal).
+  7. `ImpactAgent` — Direct callers, indirect dependencies, affected APIs, and broken tests.
+  8. `TestAgent` — Generates isolated pytest/unittest test suites with mocks and boundary tests.
+  9. `FixAgent` — Proposes targeted patches and generates unified diffs.
+  10. `DocumentationAgent` — Generates markdown documentation and API contracts.
+  11. `ArchitectureAgent` — Layer mapping (API, services, models, UI) and coupling risk analysis.
+  12. `PerformanceAgent` — Identifies N+1 query patterns, blocking I/O, and bottlenecks.
+  13. `CodeReviewAgent` — Evaluates code across 8 engineering dimensions.
+  14. `GitAgent` — Inspects commits, branches, and diffs.
+  15. `ValidationAgent` — Isolated syntax and test validation runners.
+- **Hybrid Intent Classifier**: Classifies 15 developer intents using TF-IDF and Logistic Regression with multi-intent support (e.g. *Bug Analysis + Fix Request*).
+- **Knowledge Graph & Blast Radius**: NetworkX graph linking repositories, files, classes, functions, and imports with interactive blast radius scoring (High / Medium / Low).
+- **Safe Autonomous Fix Workflow**: Inspect unified diffs -> run syntax and test validation -> approve and apply patch with automatic rollback protection.
+- **Modern Developer UI**: Clean Light Theme (GitHub + Linear + VS Code aesthetic), Command Palette (`Ctrl+K` / `Cmd+K`), split search layout, and live execution timelines.
+
+---
+
+## 🏗️ Architecture
+
+```text
+Developer Query / Task
+         ↓
+Hybrid Intent Classifier (15 Intents)
+         ↓
+Task Planner & Orchestrator
+         ↓
+Repository Context Resolver & AST Engine
+         ↓
+Hybrid RAG Retrieval (TF-IDF + Symbol + Path Matching)
+         ↓
+Specialist Agent Selection & Chaining
+         ↓
+CodeAware Deterministic Reasoner
+         ↓
+Validation & Test Runner
+         ↓
+Structured Response with Line Citations & Unified Diff
 ```
+
+---
+
+## 📦 Project Structure
+
+```text
 CODEAWARE/
-├── backend/                        # FastAPI Python backend
+├── backend/
 │   ├── app/
-│   │   ├── agents/                 # Orchestrator, RepositoryAgent, CodeAgent, RAGAgent, BugAgent, TestAgent, FixAgent
-│   │   ├── ai/                     # AIModel interface, CodeAwareReasoner
-│   │   ├── analysis/               # AST parser, CodeAnalyzer, RepositoryScanner
-│   │   ├── api/                    # FastAPI routers (repositories, code_search, agents, graph, rag, github, autonomous)
-│   │   ├── config/                 # paths.py (single source of truth), settings.py
-│   │   ├── graph/                  # CodeKnowledgeGraph, ImpactAnalyzer
-│   │   ├── ml/                     # IntentClassifier (TF-IDF + LogisticRegression)
-│   │   ├── rag/                    # CodeChunker, HybridRetriever, VectorStore, KeywordSearch
-│   │   ├── services/               # GitHubService, RepositoryService, GraphService, RAGService, AutonomousWorkflow
-│   │   └── main.py                 # FastAPI application entry point
-│   ├── .env.example                # Sample environment variables
-│   └── requirements.txt            # Python dependencies
+│   │   ├── agents/          # 15 Standardized specialist agents + Orchestrator
+│   │   ├── ai/              # Local deterministic reasoning engine & interfaces
+│   │   ├── analysis/        # AST parser (Python, JS/TS, Go, Java) & scanner
+│   │   ├── api/             # FastAPI REST endpoints
+│   │   ├── config/          # Environment settings & directory paths
+│   │   ├── graph/           # Knowledge graph builder & impact analyzer
+│   │   ├── ml/              # 15-intent classifier with TF-IDF
+│   │   ├── rag/             # Chunker, TF-IDF vector store, hybrid retriever
+│   │   ├── services/        # Ingestion, RAG, Graph, and Autonomous workflows
+│   │   └── main.py          # FastAPI application entry point
+│   ├── tests/               # Backend unit & integration test suite
+│   ├── requirements.txt     # Python dependencies
+│   └── .env.example         # Example configuration
 │
-├── frontend/                       # React 19 + Vite 8 frontend
-│   ├── src/
-│   │   ├── api/                    # Centralized Axios client & API modules (repositories, graph, agents, autonomous)
-│   │   ├── components/             # Sidebar, Toast notification system, PageWrapper
-│   │   ├── context/                # RepoContext (global active repo & workspace repo discovery)
-│   │   ├── pages/                  # Dashboard, Repositories, CodeSearch, AgentChat, CodeGraph, AutonomousFix, Settings
-│   │   ├── App.jsx                 # Router, layout & global context providers
-│   │   ├── main.jsx                # React entry point
-│   │   └── index.css               # Global dark glassmorphism design system
-│   ├── index.html
-│   └── package.json
-│
-├── data/                           # Persistent data store (auto-created)
-│   ├── repositories/
-│   ├── indexes/
-│   ├── graphs/
-│   └── embeddings/
-│
-├── workspace/                      # Runtime workspace (auto-created)
-│   ├── cloned_repositories/        # Cloned repositories live here
-│   └── sandbox/
-│
-├── .gitignore
-└── README.md
+└── frontend/
+    ├── src/
+    │   ├── api/             # Unified HTTP API client & endpoint helpers
+    │   ├── components/      # Sidebar, CommandPalette, Toast
+    │   ├── context/         # RepoContext (global state, health polling)
+    │   ├── pages/           # Dashboard, Repositories, CodeSearch, AgentChat,
+    │   │                    # CodeGraph, ImpactAnalysis, AutonomousFix,
+    │   │                    # CodeReview, TestGenerator, Settings
+    │   ├── index.css        # Light Theme design system
+    │   ├── App.jsx          # Route configuration
+    │   └── main.jsx
+    └── package.json
 ```
 
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- **Python** 3.10+
-- **Node.js** 18+ & **npm**
-- **Git** installed and on PATH
-
----
+## ⚡ Quick Start
 
 ### 1. Backend Setup
-
 ```bash
 cd backend
-
-# Create and activate virtual environment
 python -m venv venv
-
-# Windows (PowerShell)
-.\venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
-
-# Install dependencies
+.\venv\Scripts\activate      # Windows (or source venv/bin/activate on Linux/Mac)
 pip install -r requirements.txt
+
+# Run backend server
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-
-**Configure Environment Variables (optional):**
-```bash
-cp .env.example .env
-```
-*(Fill in `GITHUB_TOKEN` if you wish to use the automatic GitHub Pull Request creation feature in Autonomous Fix)*
-
-**Start the FastAPI backend:**
-```bash
-uvicorn app.main:app --reload
-```
-
-- **API URL:** `http://127.0.0.1:8000`
-- **Interactive OpenAPI Docs:** `http://127.0.0.1:8000/docs`
-- **Health Check:** `http://127.0.0.1:8000/health`
-
----
 
 ### 2. Frontend Setup
-
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start the Vite development server
 npm run dev
 ```
 
-- **Frontend App:** `http://localhost:5173`
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 🔌 API Overview
+## 🧪 Running Tests
 
-Interactive documentation is available at **`http://localhost:8000/docs`**.
-
-### 📁 Repositories & Ingestion
-| Method | Route | Description |
-|---|---|---|
-| `GET` | `/repositories/list` | List all discovered cloned repositories from workspace |
-| `POST` | `/repositories/clone-and-ingest` | Clone repo + run scan + build graph + index RAG in 1 call |
-| `POST` | `/repositories/clone` | Clone a GitHub repository |
-| `POST` | `/repositories/scan` | Scan repository file structure, directories, languages |
-| `POST` | `/repositories/code-analysis` | AST analysis (functions, classes, imports) |
-
-### 🔍 Code Search & RAG
-| Method | Route | Description |
-|---|---|---|
-| `POST` | `/code-search/search` | Natural language hybrid search with top-k code snippets |
-| `POST` | `/rag/search` | Repository-aware RAG search and context extraction |
-
-### 🤖 Agent Orchestration
-| Method | Route | Description |
-|---|---|---|
-| `POST` | `/agents/run` | Classify task intent and execute specialist agent |
-
-### 🕸️ Code Graph & Impact Analysis
-| Method | Route | Description |
-|---|---|---|
-| `POST` | `/graph/summary` | Node & edge counts by type (functions, classes, files) |
-| `POST` | `/graph/build` | Export full interactive dependency graph |
-| `POST` | `/graph/impact` | Analyze upstream impact of modifying a specific symbol |
-
-### 🛠️ Autonomous Fix
-| Method | Route | Description |
-|---|---|---|
-| `POST` | `/autonomous/run` | Execute end-to-end fix generation and AST validation |
-| `POST` | `/autonomous/approve` | Commit validated patch to a new git branch |
-| `POST` | `/autonomous/create-pr` | Create a GitHub pull request for the branch |
-
----
-
-## 🤖 Intent Classification
-
-The `IntentClassifier` (TF-IDF + Logistic Regression) automatically determines task intent and routes to the appropriate specialist agent:
-
-```
-User Query / Task
-       │
-       ▼
-┌──────────────────────────────┐
-│  ML Intent Classifier Router │
-└──────────────┬───────────────┘
-               │
-  ┌────────────┼────────────┬────────────┬────────────┐
-  ▼            ▼            ▼            ▼            ▼
-RAGAgent   RepoAgent    BugAgent    TestAgent    FixAgent
-(Search &  (Structure  (Bugs &      (Pytest      (Code Patch &
- Explain)   & Metrics)  Security)    Gen)         Diffs)
-```
-
-| Intent Class | Routed Agent | Example User Query |
-|---|---|---|
-| `code_search` | `RAGAgent` | *"Where is authentication implemented?"* |
-| `code_explanation` | `RAGAgent` | *"Explain what authenticate_user does"* |
-| `repository_analysis` | `RepositoryAgent` | *"What is the structure of this project?"* |
-| `impact_analysis` | `ImpactAgent` | *"What breaks if I modify verify_token?"* |
-| `bug_analysis` | `BugAgent` | *"Find bugs or unsafe patterns in this file"* |
-| `security_analysis` | `BugAgent` (Security mode) | *"Check for hardcoded credentials and SQL injection"* |
-| `test_generation` | `TestAgent` | *"Generate pytest test cases for these functions"* |
-| `fix_request` | `FixAgent` | *"Fix the IndexError in parser.py"* |
-| `documentation` | `RAGAgent` | *"Generate a summary and documentation for the code"* |
-
----
-
-## 🛠️ Verification & Testing
-
-### Test Backend Agents & Services:
 ```bash
 cd backend
-python -c "from app.services.repository_service import RepositoryService; from app.config.settings import CLONED_REPOSITORIES_DIR; s = RepositoryService(CLONED_REPOSITORIES_DIR); print('Repos:', s.list_repositories())"
-```
-
-### Production Frontend Build:
-```bash
-cd frontend
-npm run build
+python -m unittest tests.test_codeaware -v
 ```
 
 ---
 
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
+## 🔒 Security & Path Safety
+- Repository ingestion automatically ignores non-code directories (`.git`, `node_modules`, `venv`, `dist`, `.env`, binaries).
+- Patch application creates automatic backups and rolls back if an error occurs.
+- ValidationAgent compiles and runs test assertions inside isolated temporary directories.

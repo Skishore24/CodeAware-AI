@@ -1,78 +1,44 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import ast
-
+import re
 import networkx as nx
 
 
 class CodeKnowledgeGraph:
     """
     Knowledge graph representing relationships
-    between files, classes, functions and imports.
+    between repositories, files, classes, functions, and imports.
 
-    Node types:
-
-        repository
-        file
-        class
-        function
-        import
-
-    Edge types:
-
-        contains
-        imports
-        calls
+    Node types: repository, file, class, function, module
+    Edge types: contains, imports, calls, defines, inherits
     """
 
-    def __init__(self):
+    SUPPORTED_EXTENSIONS = {
+        ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".cpp", ".c", ".cs"
+    }
 
+    IGNORED_DIRS = {
+        ".git", "venv", ".venv", "__pycache__", "node_modules", "dist", "build", ".cache", ".idea", ".vscode"
+    }
+
+    def __init__(self):
         self.graph = nx.DiGraph()
 
-    # =========================================================
-    # RESET
-    # =========================================================
-
     def clear(self):
-
         self.graph.clear()
 
-    # =========================================================
-    # BUILD
-    # =========================================================
-
-    def build(
-        self,
-        repository_path: str
-    ) -> Dict[str, Any]:
-
+    def build(self, repository_path: str) -> Dict[str, Any]:
         self.clear()
-
-        repository = Path(
-            repository_path
-        )
+        repository = Path(repository_path)
 
         if not repository.exists():
-
-            raise FileNotFoundError(
-                f"Repository not found: "
-                f"{repository_path}"
-            )
-
+            raise FileNotFoundError(f"Repository not found: {repository_path}")
         if not repository.is_dir():
+            raise ValueError("Repository path must be a directory.")
 
-            raise ValueError(
-                "Repository path must "
-                "be a directory."
-            )
-
-        repository_name = (
-            repository.name
-        )
-
-        repository_id = (
-            f"repository:{repository_name}"
-        )
+        repository_name = repository.name
+        repository_id = f"repository:{repository_name}"
 
         self.graph.add_node(
             repository_id,
@@ -81,454 +47,204 @@ class CodeKnowledgeGraph:
             path=str(repository)
         )
 
-        python_files = list(
-            repository.rglob("*.py")
-        )
-
-        ignored = {
-            ".git",
-            "venv",
-            ".venv",
-            "__pycache__",
-            "node_modules",
-            "dist",
-            "build"
-        }
-
-        python_files = [
-            file
-            for file in python_files
-            if not any(
-                part in ignored
-                for part in file.parts
-            )
-        ]
-
-        for file in python_files:
-
-            self._process_python_file(
-                repository,
-                repository_id,
-                file
-            )
+        for path in repository.rglob("*"):
+            if not path.is_file():
+                continue
+            if any(part in self.IGNORED_DIRS for part in path.parts):
+                continue
+            if path.suffix.lower() in self.SUPPORTED_EXTENSIONS:
+                if path.suffix.lower() == ".py":
+                    self._process_python_file(repository, repository_id, path)
+                else:
+                    self._process_generic_file(repository, repository_id, path)
 
         return self.summary()
 
-    # =========================================================
-    # PROCESS PYTHON FILE
-    # =========================================================
-
-    def _process_python_file(
-        self,
-        repository: Path,
-        repository_id: str,
-        file: Path
-    ):
-
-        relative_path = str(
-            file.relative_to(
-                repository
-            )
-        ).replace("\\", "/")
-
-        file_id = (
-            f"file:{relative_path}"
-        )
+    def _process_python_file(self, repository: Path, repository_id: str, file: Path):
+        relative_path = str(file.relative_to(repository)).replace("\\", "/")
+        file_id = f"file:{relative_path}"
 
         self.graph.add_node(
             file_id,
             type="file",
             name=file.name,
-            path=relative_path
+            path=relative_path,
+            language="python"
         )
-
-        self.graph.add_edge(
-            repository_id,
-            file_id,
-            type="contains"
-        )
+        self.graph.add_edge(repository_id, file_id, type="contains")
 
         try:
-
-            source = file.read_text(
-                encoding="utf-8",
-                errors="ignore"
-            )
-
-            tree = ast.parse(
-                source
-            )
-
+            source = file.read_text(encoding="utf-8", errors="ignore")
+            tree = ast.parse(source)
         except Exception:
-
             return
 
-        # -----------------------------------------------------
-        # IMPORTS
-        # -----------------------------------------------------
-
-        for node in ast.walk(tree):
-
-            if isinstance(
-                node,
-                ast.Import
-            ):
-
-                for alias in node.names:
-
-                    self._add_import(
-                        file_id,
-                        alias.name
-                    )
-
-            elif isinstance(
-                node,
-                ast.ImportFrom
-            ):
-
-                module = (
-                    node.module
-                    or ""
-                )
-
-                self._add_import(
-                    file_id,
-                    module
-                )
-
-        # -----------------------------------------------------
-        # CLASSES
-        # -----------------------------------------------------
-
-        for node in ast.walk(tree):
-
-            if isinstance(
-                node,
-                ast.ClassDef
-            ):
-
-                self._add_class(
-                    file_id,
-                    node
-                )
-
-        # -----------------------------------------------------
-        # FUNCTIONS
-        # -----------------------------------------------------
-
-        for node in ast.walk(tree):
-
-            if isinstance(
-                node,
-                (
-                    ast.FunctionDef,
-                    ast.AsyncFunctionDef
-                )
-            ):
-
-                self._add_function(
-                    file_id,
-                    node
-                )
-
-    # =========================================================
-    # IMPORT
-    # =========================================================
-
-    def _add_import(
-        self,
-        file_id: str,
-        import_name: str
-    ):
-
-        if not import_name:
-
-            return
-
-        import_id = (
-            f"import:{import_name}"
-        )
-
-        if not self.graph.has_node(
-            import_id
-        ):
-
-            self.graph.add_node(
-                import_id,
-                type="import",
-                name=import_name
-            )
-
-        self.graph.add_edge(
-            file_id,
-            import_id,
-            type="imports"
-        )
-
-    # =========================================================
-    # CLASS
-    # =========================================================
-
-    def _add_class(
-        self,
-        file_id: str,
-        node: ast.ClassDef
-    ):
-
-        class_id = (
-            f"class:{file_id}:{node.name}"
-        )
-
-        self.graph.add_node(
-            class_id,
-            type="class",
-            name=node.name,
-            file=file_id,
-            line=node.lineno
-        )
-
-        self.graph.add_edge(
-            file_id,
-            class_id,
-            type="contains"
-        )
-
-    # =========================================================
-    # FUNCTION
-    # =========================================================
-
-    def _add_function(
-        self,
-        file_id: str,
-        node
-    ):
-
-        function_id = (
-            f"function:"
-            f"{file_id}:"
-            f"{node.name}:"
-            f"{node.lineno}"
-        )
-
-        self.graph.add_node(
-            function_id,
-            type="function",
-            name=node.name,
-            file=file_id,
-            line=node.lineno
-        )
-
-        self.graph.add_edge(
-            file_id,
-            function_id,
-            type="contains"
-        )
-
-        # -----------------------------------------------------
-        # Detect function calls
-        # -----------------------------------------------------
-
-        for child in ast.walk(node):
-
-            if not isinstance(
-                child,
-                ast.Call
-            ):
-
-                continue
-
-            called_name = (
-                self._get_call_name(
-                    child
-                )
-            )
-
-            if not called_name:
-                continue
-
-            target_id = (
-                f"symbol:{called_name}"
-            )
-
-            if not self.graph.has_node(
-                target_id
-            ):
-
+        # Top-level functions & classes
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef):
+                class_id = f"class:{relative_path}:{node.name}"
                 self.graph.add_node(
-                    target_id,
-                    type="symbol",
-                    name=called_name
+                    class_id,
+                    type="class",
+                    name=node.name,
+                    file=relative_path,
+                    line=node.lineno
                 )
+                self.graph.add_edge(file_id, class_id, type="defines")
 
-            self.graph.add_edge(
-                function_id,
-                target_id,
-                type="calls"
-            )
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        func_id = f"function:{relative_path}:{node.name}.{item.name}"
+                        self.graph.add_node(
+                            func_id,
+                            type="function",
+                            name=f"{node.name}.{item.name}",
+                            file=relative_path,
+                            line=item.lineno
+                        )
+                        self.graph.add_edge(class_id, func_id, type="contains")
+                        self._extract_calls(item, func_id)
 
-    # =========================================================
-    # CALL NAME
-    # =========================================================
-
-    def _get_call_name(
-        self,
-        node: ast.Call
-    ) -> Optional[str]:
-
-        function = node.func
-
-        if isinstance(
-            function,
-            ast.Name
-        ):
-
-            return function.id
-
-        if isinstance(
-            function,
-            ast.Attribute
-        ):
-
-            parts = []
-
-            current = function
-
-            while isinstance(
-                current,
-                ast.Attribute
-            ):
-
-                parts.append(
-                    current.attr
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_id = f"function:{relative_path}:{node.name}"
+                self.graph.add_node(
+                    func_id,
+                    type="function",
+                    name=node.name,
+                    file=relative_path,
+                    line=node.lineno
                 )
+                self.graph.add_edge(file_id, func_id, type="defines")
+                self._extract_calls(node, func_id)
 
-                current = (
-                    current.value
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        mod_id = f"module:{alias.name}"
+                        self.graph.add_node(mod_id, type="module", name=alias.name)
+                        self.graph.add_edge(file_id, mod_id, type="imports")
+                elif isinstance(node, ast.ImportFrom):
+                    mod_name = node.module or ""
+                    mod_id = f"module:{mod_name}"
+                    self.graph.add_node(mod_id, type="module", name=mod_name)
+                    self.graph.add_edge(file_id, mod_id, type="imports")
+
+    def _extract_calls(self, node: ast.AST, caller_id: str):
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                name = None
+                if isinstance(child.func, ast.Name):
+                    name = child.func.id
+                elif isinstance(child.func, ast.Attribute):
+                    name = child.func.attr
+                if name:
+                    for n, data in self.graph.nodes(data=True):
+                        if data.get("type") == "function" and (data.get("name") == name or data.get("name", "").endswith(f".{name}")):
+                            self.graph.add_edge(caller_id, n, type="calls")
+                            break
+
+    def _process_generic_file(self, repository: Path, repository_id: str, file: Path):
+        relative_path = str(file.relative_to(repository)).replace("\\", "/")
+        file_id = f"file:{relative_path}"
+
+        self.graph.add_node(
+            file_id,
+            type="file",
+            name=file.name,
+            path=relative_path,
+            language=file.suffix.replace(".", "")
+        )
+        self.graph.add_edge(repository_id, file_id, type="contains")
+
+        try:
+            source = file.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return
+
+        lines = source.splitlines()
+        for idx, line in enumerate(lines, 1):
+            sline = line.strip()
+            fn_match = re.search(r"(?:function\s+([A-Za-z0-9_]+)|(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|func\s+(?:\([^)]+\)\s*)?([A-Za-z0-9_]+))", sline)
+            if fn_match:
+                fn_name = next(g for g in fn_match.groups() if g is not None)
+                func_id = f"function:{relative_path}:{fn_name}"
+                self.graph.add_node(
+                    func_id,
+                    type="function",
+                    name=fn_name,
+                    file=relative_path,
+                    line=idx
                 )
+                self.graph.add_edge(file_id, func_id, type="defines")
 
-            if isinstance(
-                current,
-                ast.Name
-            ):
-
-                parts.append(
-                    current.id
+            class_match = re.search(r"\bclass\s+([A-Za-z0-9_]+)", sline)
+            if class_match:
+                cls_name = class_match.group(1)
+                class_id = f"class:{relative_path}:{cls_name}"
+                self.graph.add_node(
+                    class_id,
+                    type="class",
+                    name=cls_name,
+                    file=relative_path,
+                    line=idx
                 )
+                self.graph.add_edge(file_id, class_id, type="defines")
 
-            return ".".join(
-                reversed(parts)
-            )
+    def find_symbol(self, symbol: str) -> List[Dict[str, Any]]:
+        matches = []
+        sym_lower = symbol.lower()
+        for node_id, data in self.graph.nodes(data=True):
+            name = data.get("name", "")
+            if name.lower() == sym_lower or name.lower().endswith(f".{sym_lower}"):
+                matches.append({
+                    "id": node_id,
+                    "name": name,
+                    "type": data.get("type"),
+                    "file": data.get("file") or data.get("path"),
+                    "line": data.get("line"),
+                })
+        return matches
 
-        return None
-
-    # =========================================================
-    # SUMMARY
-    # =========================================================
-
-    def summary(
-        self
-    ) -> Dict[str, Any]:
-
-        type_counts = {}
-
-        for _, data in (
-            self.graph.nodes(
-                data=True
-            )
-        ):
-
-            node_type = data.get(
-                "type",
-                "unknown"
-            )
-
-            type_counts[
-                node_type
-            ] = (
-                type_counts.get(
-                    node_type,
-                    0
-                ) + 1
-            )
-
-        return {
-            "nodes":
-                self.graph.number_of_nodes(),
-
-            "edges":
-                self.graph.number_of_edges(),
-
-            "node_types":
-                type_counts
-        }
-
-    # =========================================================
-    # EXPORT
-    # =========================================================
-
-    def export(
-        self
-    ) -> Dict[str, Any]:
-
+    def export(self) -> Dict[str, Any]:
+        """Export nodes and links format for frontend visual graph rendering."""
         nodes = []
-
-        for node_id, data in (
-            self.graph.nodes(
-                data=True
-            )
-        ):
-
+        for node_id, data in self.graph.nodes(data=True):
             nodes.append({
                 "id": node_id,
-                **data
+                "name": data.get("name", node_id),
+                "type": data.get("type", "unknown"),
+                "file": data.get("file") or data.get("path", ""),
+                "line": data.get("line", 1)
             })
 
-        edges = []
-
-        for source, target, data in (
-            self.graph.edges(
-                data=True
-            )
-        ):
-
-            edges.append({
-                "source": source,
-                "target": target,
-                **data
+        links = []
+        for src, dst, data in self.graph.edges(data=True):
+            links.append({
+                "source": src,
+                "target": dst,
+                "type": data.get("type", "contains")
             })
 
         return {
             "nodes": nodes,
-            "edges": edges
+            "links": links,
+            "summary": self.summary()
         }
 
-    # =========================================================
-    # FIND SYMBOL
-    # =========================================================
+    def summary(self) -> Dict[str, Any]:
+        node_types = {}
+        for _, data in self.graph.nodes(data=True):
+            t = data.get("type", "unknown")
+            node_types[t] = node_types.get(t, 0) + 1
 
-    def find_symbol(
-        self,
-        name: str
-    ) -> List[Dict[str, Any]]:
+        edge_types = {}
+        for _, _, data in self.graph.edges(data=True):
+            t = data.get("type", "unknown")
+            edge_types[t] = edge_types.get(t, 0) + 1
 
-        matches = []
-
-        for node_id, data in (
-            self.graph.nodes(
-                data=True
-            )
-        ):
-
-            if (
-                data.get("name", "")
-                .lower()
-                ==
-                name.lower()
-            ):
-
-                matches.append({
-                    "id": node_id,
-                    **data
-                })
-
-        return matches
+        return {
+            "total_nodes": self.graph.number_of_nodes(),
+            "total_edges": self.graph.number_of_edges(),
+            "node_types": node_types,
+            "edge_types": edge_types,
+        }

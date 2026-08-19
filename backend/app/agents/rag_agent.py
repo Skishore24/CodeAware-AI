@@ -1,163 +1,109 @@
 from pathlib import Path
-from typing import Any, Dict
-
+from typing import Any, Dict, List, Optional
 from app.agents.base_agent import BaseAgent
 from app.services.rag_service import RAGService
 from app.ai.reasoner import CodeAwareReasoner
-from app.config.paths import CLONED_REPOSITORIES_DIR
+from app.config.settings import CLONED_REPOSITORIES_DIR
 
 
 class RAGAgent(BaseAgent):
+    """
+    RAG Agent retrieving relevant repository chunks, AST symbols,
+    and synthesizing citations and explanations using the CodeAware Local Reasoner.
+    """
 
-    def __init__(self):
+    name = "RAGAgent"
+    description = "Retrieves relevant repository chunks and produces structured answers with source citations."
 
-        super().__init__(
-            name="RAG Agent",
-            description=(
-                "Retrieves relevant repository "
-                "information and produces "
-                "repository-aware answers."
-            ),
-        )
+    def __init__(self, rag_service: Optional[RAGService] = None, reasoner: Optional[CodeAwareReasoner] = None):
+        self.rag_service = rag_service or RAGService()
+        self.reasoner = reasoner or CodeAwareReasoner()
 
-        self.reasoner = CodeAwareReasoner()
+    def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        repository_path = input_data.get("repository_path")
+        repository_name = input_data.get("repository_name")
+        question = input_data.get("question") or input_data.get("task", "")
+        top_k = input_data.get("top_k", 8)
 
-    # ---------------------------------------------------------
-    # Run
-    # ---------------------------------------------------------
-
-    def run(
-        self,
-        input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-
-        repository_path = input_data.get(
-            "repository_path"
-        )
-
-        repository_name = input_data.get(
-            "repository_name"
-        )
-
-        question = input_data.get(
-            "question"
-        )
-
-        top_k = input_data.get(
-            "top_k",
-            8
-        )
-
-        # -----------------------------------------------------
-        # Resolve repository name to path
-        # -----------------------------------------------------
+        if not repository_path and repository_name:
+            repository_path = str(Path(CLONED_REPOSITORIES_DIR) / repository_name)
 
         if not repository_path:
-
-            if not repository_name:
-
-                return {
-                    "success": False,
-                    "agent": self.name,
-                    "error": (
-                        "repository_name or "
-                        "repository_path is required."
-                    ),
-                }
-
-            repository_path = (
-                CLONED_REPOSITORIES_DIR
-                / repository_name
+            return self.create_response(
+                success=False,
+                summary="repository_path is required.",
+                error="Missing repository."
             )
-
-        repository_path = Path(
-            repository_path
-        )
-
-        # -----------------------------------------------------
-        # Validate repository
-        # -----------------------------------------------------
-
-        if not repository_path.exists():
-
-            return {
-
-                "success": False,
-
-                "agent": self.name,
-
-                "error": (
-                    "Repository does not exist: "
-                    f"{repository_path}"
-                ),
-
-            }
 
         if not question:
+            return self.create_response(
+                success=False,
+                summary="Question is required.",
+                error="Missing question."
+            )
 
-            return {
-
-                "success": False,
-
-                "agent": self.name,
-
-                "error": (
-                    "question is required."
-                ),
-
-            }
+        repo = Path(repository_path)
+        if not repo.exists():
+            return self.create_response(
+                success=False,
+                summary=f"Repository not found at {repository_path}",
+                error="Repository does not exist."
+            )
 
         try:
-
-            rag_service = RAGService()
-
-            retrieval = rag_service.search(
-                repository_path=str(repository_path),
+            retrieval = self.rag_service.search(
+                repository_path=str(repo),
                 query=question,
-                top_k=top_k,
+                top_k=top_k
             )
 
-            context = retrieval.get(
-                "context",
-                ""
-            )
+            context = retrieval.get("context", "")
+            chunks = retrieval.get("chunks", [])
 
+            # Generate structured response with citations
             answer = self.reasoner.generate(
                 prompt=question,
                 context=context
             )
 
-            return {
+            matched_files = list(dict.fromkeys([c.get("file", "") for c in chunks if c.get("file")]))
+            citations = self.reasoner.extract_citations(context)
 
-                "success": True,
+            findings = []
+            for c in chunks:
+                findings.append({
+                    "file": c.get("file"),
+                    "symbol": c.get("symbol"),
+                    "start_line": c.get("start_line", 1),
+                    "end_line": c.get("end_line", 1),
+                    "score": round(float(c.get("score", 0.0)), 3),
+                    "code_snippet": c.get("text", "")[:250]
+                })
 
-                "agent": self.name,
+            summary = f"Retrieved {len(chunks)} code chunks from {len(matched_files)} files to answer: '{question[:50]}'."
 
-                "repository": (
-                    str(repository_path)
-                ),
-
-                "question": question,
-
-                "answer": answer,
-
-                "retrieval": retrieval,
-
-                "model": (
-                    self.reasoner
-                    .get_model_info()
-                ),
-
-            }
+            return self.create_response(
+                success=True,
+                confidence=0.92 if chunks else 0.50,
+                summary=summary,
+                findings=findings,
+                files=matched_files,
+                recommendations=[
+                    "Inspect line citations in the code editor",
+                    "Run impact analysis on referenced symbols"
+                ] if chunks else ["Try searching for specific function or class names."],
+                evidence=[{"citation": f"{c['file']}:{c['start']}-{c['end']}"} for c in citations[:8]],
+                next_actions=["View full source files", "Ask follow-up questions on symbols"],
+                raw_data={
+                    "answer": answer,
+                    "model_info": self.reasoner.get_model_info(),
+                    "chunks": chunks
+                }
+            )
 
         except Exception as exc:
-
-            return {
-
-                "success": False,
-
-                "agent": self.name,
-
-                "error": str(exc),
-
-            }
+            return self.create_response(
+                success=False,
+                summary=f"RAG reasoning failed: {exc}",
+                error=str(exc)
+            )

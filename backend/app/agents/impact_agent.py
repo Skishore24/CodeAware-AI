@@ -1,252 +1,100 @@
 from pathlib import Path
-from typing import Any, Dict
-
+from typing import Any, Dict, List, Optional
+from app.agents.base_agent import BaseAgent
+from app.config.settings import CLONED_REPOSITORIES_DIR
 from app.services.graph_service import GraphService
 
 
-class ImpactAgent:
+class ImpactAgent(BaseAgent):
     """
-    Analyzes the potential impact of changing
-    a function, class, method, or symbol.
+    Analyzes code dependencies and calculates blast radius, callers, callees,
+    affected APIs, and potentially broken tests when a symbol or file is changed.
     """
 
-    name = "Impact Agent"
+    name = "ImpactAgent"
+    description = "Calculates blast radius, callers, callees, and affected dependencies."
 
-    description = (
-        "Analyzes code dependencies and determines "
-        "which functions and files may be affected "
-        "by changing a symbol."
-    )
+    def __init__(self, graph_service: Optional[GraphService] = None):
+        self.graph_service = graph_service or GraphService()
 
-    def run(
-        self,
-        input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        repository_path = input_data.get("repository_path")
+        repository_name = input_data.get("repository_name")
+        symbol = input_data.get("symbol") or input_data.get("symbol_name") or input_data.get("target")
 
-        # =================================================
-        # Read input
-        # =================================================
-
-        repository_path = input_data.get(
-            "repository_path"
-        )
-
-        repository_name = input_data.get(
-            "repository_name"
-        )
-
-        symbol = (
-            input_data.get("symbol")
-            or input_data.get("symbol_name")
-        )
-
-        # =================================================
-        # Resolve repository path
-        # =================================================
+        if not repository_path and repository_name:
+            repository_path = str(Path(CLONED_REPOSITORIES_DIR) / repository_name)
 
         if not repository_path:
-
-            if not repository_name:
-
-                return {
-                    "success": False,
-                    "agent": self.name,
-                    "error": (
-                        "repository_name or "
-                        "repository_path is required."
-                    )
-                }
-
-            from app.config.paths import (
-                CLONED_REPOSITORIES_DIR
+            return self.create_response(
+                success=False,
+                summary="repository_path is required.",
+                error="Missing repository."
             )
-
-            repository_path = (
-                CLONED_REPOSITORIES_DIR
-                / repository_name
-            )
-
-        repository_path = Path(
-            repository_path
-        )
-
-        # =================================================
-        # Validate repository
-        # =================================================
-
-        if not repository_path.exists():
-
-            return {
-                "success": False,
-                "agent": self.name,
-                "error": (
-                    "Repository does not exist: "
-                    f"{repository_path}"
-                )
-            }
-
-        if not repository_path.is_dir():
-
-            return {
-                "success": False,
-                "agent": self.name,
-                "error": (
-                    "Repository path is not a directory: "
-                    f"{repository_path}"
-                )
-            }
-
-        # =================================================
-        # Validate symbol
-        # =================================================
 
         if not symbol:
-
-            return {
-                "success": False,
-                "agent": self.name,
-                "error": (
-                    "symbol or symbol_name is required."
-                )
-            }
-
-        # =================================================
-        # Build graph and analyze impact
-        # =================================================
+            return self.create_response(
+                success=False,
+                summary="Symbol name is required for impact analysis.",
+                error="Missing symbol."
+            )
 
         try:
-
-            graph_service = GraphService(
-                repository_path
+            impact_res = self.graph_service.get_impact(
+                repository_path=str(repository_path),
+                symbol_name=str(symbol)
             )
 
-            result = graph_service.get_impact(
-                symbol
+            direct = impact_res.get("direct_callers", [])
+            indirect = impact_res.get("indirect_callers", [])
+            dependent_files = impact_res.get("dependent_files", [])
+            affected_apis = impact_res.get("affected_apis", [])
+            broken_tests = impact_res.get("potentially_broken_tests", [])
+            blast_radius = impact_res.get("blast_radius_score", "LOW")
+            count = impact_res.get("count", 0)
+
+            findings = []
+            for d in direct:
+                findings.append({
+                    "name": d.get("name"),
+                    "type": d.get("type"),
+                    "file": d.get("path"),
+                    "relation": "Direct Caller",
+                    "severity": "HIGH"
+                })
+            for ind in indirect[:10]:
+                findings.append({
+                    "name": ind.get("name"),
+                    "type": ind.get("type"),
+                    "file": ind.get("path"),
+                    "relation": "Indirect Dependency",
+                    "severity": "MEDIUM"
+                })
+
+            summary = (
+                f"Blast Radius for '{symbol}': {blast_radius} ({count} affected nodes across {len(dependent_files)} files). "
+                f"Identified {len(direct)} direct callers, {len(affected_apis)} affected APIs, and {len(broken_tests)} test suites."
             )
 
-            # ---------------------------------------------
-            # Handle graph failure
-            # ---------------------------------------------
-
-            if not result.get(
-                "success",
-                False
-            ):
-
-                return {
-                    "success": False,
-                    "agent": self.name,
-                    "target": symbol,
-                    "message": result.get(
-                        "message",
-                        "Symbol was not found."
-                    ),
-                    "matching_nodes": result.get(
-                        "matching_nodes",
-                        []
-                    ),
-                    "affected_nodes": []
-                }
-
-            # ---------------------------------------------
-            # Affected nodes
-            # ---------------------------------------------
-
-            affected_nodes = result.get(
-                "affected_nodes",
-                []
+            return self.create_response(
+                success=True,
+                confidence=0.95,
+                summary=summary,
+                findings=findings,
+                files=dependent_files,
+                recommendations=[
+                    f"Refactor direct callers in: {', '.join([d.get('path', '') for d in direct[:3]])}",
+                    "Run regression test suites before and after symbol modifications",
+                    "Maintain backwards compatibility if modifying public API signatures"
+                ] if count > 0 else ["Symbol has no detected downstream dependents in knowledge graph."],
+                evidence=[{"symbol": symbol, "blast_radius": blast_radius, "count": count}],
+                next_actions=["Run affected test suites", "Inspect caller call-sites", "Generate unified diff"],
+                raw_data=impact_res
             )
-
-            affected_count = len(
-                affected_nodes
-            )
-
-            # ---------------------------------------------
-            # Risk calculation
-            # ---------------------------------------------
-
-            if affected_count == 0:
-
-                risk = "LOW"
-
-            elif affected_count <= 3:
-
-                risk = "MEDIUM"
-
-            else:
-
-                risk = "HIGH"
-
-            # ---------------------------------------------
-            # Collect affected files
-            # ---------------------------------------------
-
-            affected_files = set()
-
-            for node in affected_nodes:
-
-                file_path = node.get(
-                    "file"
-                )
-
-                if file_path:
-
-                    affected_files.add(
-                        str(file_path)
-                    )
-
-            # ---------------------------------------------
-            # Return result
-            # ---------------------------------------------
-
-            return {
-
-                "success": True,
-
-                "agent": self.name,
-
-                "target": symbol,
-
-                "risk": risk,
-
-                "affected_count": (
-                    affected_count
-                ),
-
-                "affected_files": sorted(
-                    affected_files
-                ),
-
-                "affected_nodes": (
-                    affected_nodes
-                ),
-
-                "matching_nodes": (
-                    result.get(
-                        "matching_nodes",
-                        []
-                    )
-                ),
-
-                "message": (
-                    f"Changing '{symbol}' "
-                    f"may affect "
-                    f"{affected_count} "
-                    f"code entities."
-                )
-
-            }
 
         except Exception as exc:
-
-            return {
-
-                "success": False,
-
-                "agent": self.name,
-
-                "target": symbol,
-
-                "error": str(exc)
-
-            }
+            return self.create_response(
+                success=False,
+                summary=f"Impact analysis failed: {exc}",
+                error=str(exc)
+            )

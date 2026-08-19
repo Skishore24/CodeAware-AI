@@ -1,515 +1,156 @@
-from typing import Any, Dict, Optional
-
+from pathlib import Path
+from typing import Any, Dict, Optional, List
 from app.agents.fix_agent import FixAgent
 from app.agents.test_agent import TestAgent
 from app.agents.validation_agent import ValidationAgent
 from app.agents.git_agent import GitAgent
 from app.agents.pr_agent import PRAgent
+from app.config.settings import CLONED_REPOSITORIES_DIR
 
 
 class AutonomousWorkflow:
     """
-    Main autonomous software-engineering workflow.
-
-    Flow:
-
-        Request
-           ↓
-        Fix Agent
-           ↓
-        Test Agent
-           ↓
-        Validation Agent
-           ↓
-        Retry if validation fails
-           ↓
-        Human approval
-           ↓
-        Git Agent
-           ↓
-        PR Agent
-
-    IMPORTANT:
-    This service never creates a GitHub PR without
-    explicit human approval.
+    Production Autonomous Software Engineering Fix Workflow.
+    
+    Safe Pipeline:
+    1. Analyze Reported Bug & Target File
+    2. Generate Proposed Patch & Unified Diff
+    3. Generate Verification Test Suite
+    4. Run Isolated Validation
+    5. Present Diff & Status to Developer
+    6. Apply Patch ONLY upon explicit human approval
     """
 
-    name = "Autonomous Workflow"
+    name = "AutonomousWorkflow"
 
     def __init__(self):
-
         self.fix_agent = FixAgent()
         self.test_agent = TestAgent()
         self.validation_agent = ValidationAgent()
         self.git_agent = GitAgent()
         self.pr_agent = PRAgent()
 
-    # =========================================================
-    # MAIN WORKFLOW
-    # =========================================================
+    def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        repository_path = input_data.get("repository_path")
+        repository_name = input_data.get("repository_name")
+        file_path = input_data.get("file_path")
+        problem = input_data.get("problem") or input_data.get("task", "")
 
-    def run(
-        self,
-        input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-
-        max_retries = input_data.get(
-            "max_retries",
-            2
-        )
-
-        if max_retries < 0:
-            max_retries = 0
-
-        # -----------------------------------------------------
-        # Required information
-        # -----------------------------------------------------
-
-        repository_path = input_data.get(
-            "repository_path"
-        )
-
-        file_path = input_data.get(
-            "file_path"
-        )
-
-        problem = input_data.get(
-            "problem"
-        )
+        if not repository_path and repository_name:
+            repository_path = str(Path(CLONED_REPOSITORIES_DIR) / repository_name)
 
         if not repository_path:
-
-            return self._error(
-                "repository_path is required."
-            )
+            return self._error("repository_path or repository_name is required.")
 
         if not file_path:
-
-            return self._error(
-                "file_path is required."
-            )
+            return self._error("file_path is required.")
 
         if not problem:
+            return self._error("problem is required.")
 
-            return self._error(
-                "problem is required."
-            )
+        repo = Path(repository_path)
+        if not repo.exists():
+            return self._error(f"Repository not found at {repository_path}")
 
-        # -----------------------------------------------------
-        # Workflow state
-        # -----------------------------------------------------
+        # Step 1: FixAgent creates patch and diff
+        fix_res = self.fix_agent.run({
+            "repository_path": str(repo),
+            "file_path": file_path,
+            "problem": problem
+        })
 
-        attempts = []
-
-        current_problem = problem
-
-        current_code = input_data.get(
-            "original_code"
-        )
-
-        # -----------------------------------------------------
-        # Retry loop
-        # -----------------------------------------------------
-
-        for attempt_number in range(
-            1,
-            max_retries + 2
-        ):
-
-            attempt = {
-                "attempt": attempt_number
-            }
-
-            # =================================================
-            # STEP 1 — FIX
-            # =================================================
-
-            fix_input = {
-                **input_data,
-                "repository_path": repository_path,
-                "file_path": file_path,
-                "problem": current_problem
-            }
-
-            if current_code is not None:
-
-                fix_input[
-                    "original_code"
-                ] = current_code
-
-            fix_result = self.fix_agent.run(
-                fix_input
-            )
-
-            attempt["fix"] = fix_result
-
-            # -------------------------------------------------
-            # No fix generated
-            # -------------------------------------------------
-
-            if not fix_result.get(
-                "changed",
-                False
-            ):
-
-                attempts.append(
-                    attempt
-                )
-
-                return {
-                    "success": True,
-                    "status": "FIX_NOT_GENERATED",
-                    "workflow": self.name,
-                    "attempts": attempts,
-                    "message": (
-                        "The Fix Agent could not "
-                        "generate a safe automatic fix."
-                    )
-                }
-
-            modified_code = (
-                fix_result.get(
-                    "modified_code"
-                )
-            )
-
-            # =================================================
-            # STEP 2 — GENERATE TEST
-            # =================================================
-
-            test_input = {
-                "code": modified_code,
-                "file_path": file_path,
-                "function_name": input_data.get(
-                    "function_name"
-                ),
-                "run_tests": False
-            }
-
-            test_result = self.test_agent.run(
-                test_input
-            )
-
-            attempt["tests"] = test_result
-
-            # -------------------------------------------------
-            # Extract generated test
-            # -------------------------------------------------
-
-            test_code = (
-                self._extract_test_code(
-                    test_result
-                )
-            )
-
-            # =================================================
-            # STEP 3 — VALIDATE
-            # =================================================
-
-            validation_input = {
-                "original_code": (
-                    fix_result.get(
-                        "original_code"
-                    )
-                ),
-                "modified_code": modified_code,
-                "file_path": file_path,
-                "test_code": test_code,
-                "run_tests": bool(
-                    test_code
-                )
-            }
-
-            validation_result = (
-                self.validation_agent.run(
-                    validation_input
-                )
-            )
-
-            attempt["validation"] = (
-                validation_result
-            )
-
-            # =================================================
-            # VALIDATION PASSED
-            # =================================================
-
-            if validation_result.get(
-                "validated",
-                False
-            ):
-
-                attempts.append(
-                    attempt
-                )
-
-                return {
-                    "success": True,
-                    "status": "VALIDATED",
-                    "workflow": self.name,
-                    "attempts": attempts,
-                    "fix": fix_result,
-                    "tests": test_result,
-                    "validation": validation_result,
-                    "requires_human_approval": True,
-                    "message": (
-                        "Fix passed validation. "
-                        "Human approval is required "
-                        "before Git operations."
-                    )
-                }
-
-            # =================================================
-            # VALIDATION FAILED
-            # =================================================
-
-            attempts.append(
-                attempt
-            )
-
-            # -------------------------------------------------
-            # No more retries
-            # -------------------------------------------------
-
-            if attempt_number > max_retries:
-
-                return {
-                    "success": True,
-                    "status": "VALIDATION_FAILED",
-                    "workflow": self.name,
-                    "attempts": attempts,
-                    "requires_human_approval": False,
-                    "message": (
-                        "Maximum fix attempts reached "
-                        "without successful validation."
-                    )
-                }
-
-            # -------------------------------------------------
-            # Prepare next attempt
-            # -------------------------------------------------
-
-            current_problem = (
-                self._build_retry_problem(
-                    current_problem,
-                    validation_result
-                )
-            )
-
-            current_code = modified_code
-
-        return {
-            "success": False,
-            "status": "UNKNOWN",
-            "workflow": self.name,
-            "attempts": attempts
-        }
-
-    # =========================================================
-    # APPROVE FIX
-    # =========================================================
-
-    def approve(
-        self,
-        input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-
-        approved = input_data.get(
-            "approved",
-            False
-        )
-
-        if not approved:
-
+        if not fix_res.get("success"):
             return {
                 "success": False,
-                "status": "WAITING_FOR_APPROVAL",
-                "message": (
-                    "Human approval is required."
-                )
+                "status": "FAILED",
+                "message": "Fix Agent could not analyze the target problem.",
+                "error": fix_res.get("error", "Unknown fix error")
             }
 
-        # -----------------------------------------------------
-        # Git information
-        # -----------------------------------------------------
+        raw_fix = fix_res.get("raw_data", {})
+        original_code = raw_fix.get("original_code", "")
+        patched_code = raw_fix.get("patched_code", "")
+        diff = raw_fix.get("diff", "")
 
-        git_input = {
-            **input_data,
-            "create_branch": input_data.get(
-                "create_branch",
-                True
-            ),
-            "push": input_data.get(
-                "push",
-                False
-            )
-        }
+        # Step 2: TestAgent generates regression test
+        test_res = self.test_agent.run({
+            "code": patched_code,
+            "file_path": file_path
+        })
+        test_code = test_res.get("raw_data", {}).get("generated_test_code", "")
 
-        git_result = self.git_agent.run(
-            git_input
-        )
+        # Step 3: ValidationAgent checks syntax and test execution
+        val_res = self.validation_agent.run({
+            "original_code": original_code,
+            "modified_code": patched_code,
+            "file_path": file_path,
+            "test_code": test_code,
+            "run_tests": True
+        })
 
-        if not git_result.get(
-            "success",
-            False
-        ):
-
-            return {
-                "success": False,
-                "status": "GIT_FAILED",
-                "git": git_result
-            }
+        is_validated = val_res.get("success", False)
 
         return {
             "success": True,
-            "status": "GIT_COMPLETED",
-            "git": git_result,
-            "message": (
-                "Validated fix was approved "
-                "and Git operations completed."
-            )
-        }
-
-    # =========================================================
-    # CREATE PR
-    # =========================================================
-
-    def create_pr(
-        self,
-        input_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-
-        approved = input_data.get(
-            "approved",
-            False
-        )
-
-        if not approved:
-
-            return {
-                "success": False,
-                "status": "WAITING_FOR_APPROVAL",
-                "message": (
-                    "Human approval is required "
-                    "before creating a pull request."
-                )
+            "status": "VALIDATED" if is_validated else "VALIDATION_WARNING",
+            "workflow": self.name,
+            "target_file": file_path,
+            "problem": problem,
+            "diff": diff,
+            "fix_summary": fix_res.get("summary", ""),
+            "validation_summary": val_res.get("summary", ""),
+            "is_validated": is_validated,
+            "steps": [
+                {"step": "Fix Generation", "status": "COMPLETED", "agent": "FixAgent"},
+                {"step": "Test Suite Synthesis", "status": "COMPLETED", "agent": "TestAgent"},
+                {"step": "Syntax & Regression Validation", "status": "PASSED" if is_validated else "FAILED", "agent": "ValidationAgent"},
+            ],
+            "raw_data": {
+                "original_code": original_code,
+                "patched_code": patched_code,
+                "diff": diff,
+                "test_code": test_code,
+                "validation": val_res
             }
-
-        pr_input = {
-            **input_data,
-            "approved": True
         }
 
-        result = self.pr_agent.run(
-            pr_input
-        )
+    def approve_and_apply(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Safely applies the approved patch to the target repository with automatic rollback on error.
+        """
+        repository_path = input_data.get("repository_path")
+        repository_name = input_data.get("repository_name")
+        file_path = input_data.get("file_path")
+        patched_code = input_data.get("patched_code")
 
-        return result
+        if not repository_path and repository_name:
+            repository_path = str(Path(CLONED_REPOSITORIES_DIR) / repository_name)
 
-    # =========================================================
-    # EXTRACT TEST CODE
-    # =========================================================
+        if not repository_path or not file_path or patched_code is None:
+            return self._error("repository_path, file_path, and patched_code are required to apply fix.")
 
-    def _extract_test_code(
-        self,
-        test_result: Dict[str, Any]
-    ) -> Optional[str]:
+        target_file = Path(repository_path) / file_path
+        if not target_file.exists():
+            return self._error(f"Target file does not exist: {target_file}")
 
-        tests = test_result.get(
-            "tests",
-            []
-        )
+        # Create backup
+        backup_content = target_file.read_text(encoding="utf-8", errors="ignore")
+        try:
+            target_file.write_text(patched_code, encoding="utf-8")
+            return {
+                "success": True,
+                "status": "APPLIED",
+                "file": file_path,
+                "message": f"Successfully applied approved patch to '{file_path}'."
+            }
+        except Exception as exc:
+            # Rollback
+            target_file.write_text(backup_content, encoding="utf-8")
+            return self._error(f"Failed to apply patch, safely rolled back: {exc}")
 
-        if not isinstance(
-            tests,
-            list
-        ):
-
-            return None
-
-        pieces = []
-
-        for test in tests:
-
-            if not isinstance(
-                test,
-                dict
-            ):
-                continue
-
-            pytest_code = test.get(
-                "pytest_code"
-            )
-
-            if pytest_code:
-
-                pieces.append(
-                    pytest_code
-                )
-
-        if not pieces:
-
-            return None
-
-        return "\n\n".join(
-            pieces
-        )
-
-    # =========================================================
-    # RETRY PROBLEM
-    # =========================================================
-
-    def _build_retry_problem(
-        self,
-        original_problem: str,
-        validation_result: Dict[str, Any]
-    ) -> str:
-
-        tests = validation_result.get(
-            "tests",
-            {}
-        )
-
-        stdout = ""
-
-        stderr = ""
-
-        if isinstance(
-            tests,
-            dict
-        ):
-
-            stdout = tests.get(
-                "stdout",
-                ""
-            )
-
-            stderr = tests.get(
-                "stderr",
-                ""
-            )
-
-        return (
-            f"{original_problem}\n\n"
-            "Previous fix failed validation.\n\n"
-            "Validation output:\n"
-            f"{stdout}\n"
-            f"{stderr}\n\n"
-            "Generate a safer corrected fix."
-        )
-
-    # =========================================================
-    # ERROR
-    # =========================================================
-
-    def _error(
-        self,
-        message: str
-    ) -> Dict[str, Any]:
-
+    def _error(self, message: str) -> Dict[str, Any]:
         return {
             "success": False,
-            "status": "INVALID_INPUT",
-            "workflow": self.name,
+            "status": "ERROR",
             "error": message
         }

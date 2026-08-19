@@ -1,8 +1,14 @@
 import client from "./client";
 
-export const searchRAG = (repositoryName, query, topK = 8) =>
-  client.post("/rag/search", {
+export const searchCode = (repositoryName, query, filters = {}) =>
+  client.post("/code-search/search", {
     repository_name: repositoryName,
     query,
-    top_k: topK,
+    ...filters,
+  });
+
+export const askRAG = (repositoryName, question) =>
+  client.post("/rag/ask", {
+    repository_name: repositoryName,
+    question,
   });
