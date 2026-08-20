@@ -5,11 +5,11 @@ from app.ai.model_interface import AIModel
 
 class CodeAwareReasoner(AIModel):
     """
-    Production-grade CodeAware Local Reasoning Engine.
+    Production-grade CodeAware Local Deterministic Reasoning Engine.
     
-    Performs deterministic, repository-aware code intelligence and synthesis
+    Synthesizes rich developer intelligence, citations, and architecture insights
     over AST symbols, dependency graphs, static diagnostics, and retrieved chunks.
-    Does NOT use external paid APIs or fake mock completions.
+    Operates 100% locally with zero external API calls or mock placeholders.
     """
 
     def __init__(self):
@@ -24,7 +24,7 @@ class CodeAwareReasoner(AIModel):
         **kwargs: Any
     ) -> str:
         """
-        Synthesize a rich, structured developer explanation from query and retrieved context.
+        Synthesize a rich, structured developer explanation from query and retrieved repository context.
         """
         if not prompt or not prompt.strip():
             return "No question or query was provided for analysis."
@@ -53,22 +53,22 @@ class CodeAwareReasoner(AIModel):
             sections.append("")
 
         if citations:
-            sections.append("**Exact Code Locations:**")
+            sections.append("**Exact Code Locations & Citations:**")
             for cit in citations[:6]:
-                sections.append(f"- [{cit['file']} (Lines {cit['start']}-{cit['end']})]")
+                sections.append(f"- `{cit['file']}:{cit['start']}-{cit['end']}`")
             sections.append("")
 
         # Synthesis & Explanation
         sections.append("### Code Context & Reasoning:")
         if context.strip():
-            # Extract meaningful comments/docstrings/signatures from the context
             summary_points = self._synthesize_points(question, context)
             if summary_points:
                 for pt in summary_points:
                     sections.append(f"- {pt}")
                 sections.append("")
 
-            sections.append("```\n" + context[:1500] + ("\n... [truncated for brevity]" if len(context) > 1500 else "") + "\n```")
+            preview = context[:1500] + ("\n... [truncated for display]" if len(context) > 1500 else "")
+            sections.append("```\n" + preview + "\n```")
         else:
             sections.append("No specific code chunks matched the exact query criteria in the indexed repository.")
 
@@ -81,22 +81,22 @@ class CodeAwareReasoner(AIModel):
             if line.startswith("FILE:") or line.startswith("File:"):
                 parts = line.split(":", 1)
                 if len(parts) > 1 and parts[1].strip():
-                    files.append(parts[1].strip())
-            # Match path patterns
-            match = re.search(r"([\w\-./]+\.(?:py|js|jsx|ts|tsx|go|java|cpp|c|h|cs))", line)
+                    f = parts[1].split("(")[0].strip()
+                    if f: files.append(f)
+            match = re.search(r"([\w\-./]+\.(?:py|js|jsx|ts|tsx|go|java|cpp|c|h|cs|rs))", line)
             if match:
                 files.append(match.group(1))
         return list(dict.fromkeys(files))
 
     def extract_symbols(self, context: str) -> List[str]:
         symbols = []
-        # Match def, class, function, const declarations
         patterns = [
             r"\bdef\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             r"\bclass\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             r"\bfunction\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             r"\bconst\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",
             r"\blet\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",
+            r"\bfn\s+([a-zA-Z_][a-zA-Z0-9_]*)",
         ]
         for pat in patterns:
             for match in re.finditer(pat, context):
@@ -105,7 +105,6 @@ class CodeAwareReasoner(AIModel):
 
     def extract_citations(self, context: str) -> List[Dict[str, Any]]:
         citations = []
-        # Pattern: FILE: path/to/file.py (Lines 10-35) or similar
         for line in context.splitlines():
             match = re.search(r"(?:FILE|File):\s*([^\s(:]+)(?::(\d+)(?:-(\d+))?|\s*\(Lines\s*(\d+)-(\d+)\))?", line)
             if match:
@@ -116,6 +115,7 @@ class CodeAwareReasoner(AIModel):
                     "file": file_path,
                     "start": int(start) if str(start).isdigit() else 1,
                     "end": int(end) if str(end).isdigit() else int(start) if str(start).isdigit() else 1,
+                    "citation": f"{file_path}:{start}-{end}"
                 })
         return citations
 
@@ -131,14 +131,15 @@ class CodeAwareReasoner(AIModel):
         # Check for functions/classes
         defs = [l for l in lines if l.startswith("def ") or l.startswith("class ") or l.startswith("function ") or "async def " in l]
         if defs:
-            points.append(f"Primary definitions: {', '.join([d.split('(')[0].replace('def ', '').replace('class ', '') for d in defs[:4]])}")
+            clean_defs = [d.split('(')[0].replace('async def ', '').replace('def ', '').replace('class ', '') for d in defs[:4]]
+            points.append(f"Primary definitions: {', '.join(clean_defs)}")
 
         # Check for error handling
-        if "try:" in context or "catch" in context or "except " in context:
+        if any(kw in context for kw in ["try:", "catch", "except "]):
             points.append("Includes structured exception handling blocks.")
 
         # Check for async
-        if "async " in context or "await " in context or "Promise" in context:
+        if any(kw in context for kw in ["async ", "await ", "Promise"]):
             points.append("Asynchronous execution pattern detected.")
 
         return points

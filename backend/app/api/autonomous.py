@@ -34,6 +34,17 @@ class ApprovalRequest(BaseModel):
     approved: bool = True
 
 
+class PRRequest(BaseModel):
+    owner: str
+    repo_name: str
+    head_branch: str
+    base_branch: str = "main"
+    title: Optional[str] = None
+    body: Optional[str] = None
+    approved: bool = True
+    github_token: Optional[str] = None
+
+
 @router.post("/run")
 def run_autonomous_workflow(request: AutonomousRequest):
     try:
@@ -49,5 +60,13 @@ def approve_fix(request: ApprovalRequest):
         if not data.get("patched_code") and data.get("modified_code"):
             data["patched_code"] = data["modified_code"]
         return workflow.approve_and_apply(data)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/create-pr")
+def create_pull_request(request: PRRequest):
+    try:
+        return workflow.create_pull_request(request.model_dump())
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

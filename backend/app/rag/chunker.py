@@ -11,19 +11,19 @@ class CodeChunker:
 
     SUPPORTED_EXTENSIONS = {
         ".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".cpp", ".c", ".h",
-        ".cs", ".go", ".rs", ".php", ".rb", ".html", ".css", ".sql", ".md", ".json", ".yaml"
+        ".cs", ".go", ".rs", ".php", ".rb", ".html", ".css", ".sql", ".md", ".json", ".yaml", ".yml"
     }
 
     IGNORED_DIRECTORIES = {
         ".git", ".venv", "venv", "env", "__pycache__", "node_modules",
-        "dist", "build", "coverage", ".pytest_cache", ".idea", ".vscode"
+        "dist", "build", "coverage", ".pytest_cache", ".idea", ".vscode", "out", "target"
     }
 
     def __init__(
         self,
         repository_path: Optional[Path | str] = None,
-        chunk_size: int = 60,
-        overlap: int = 15,
+        chunk_size: int = 50,
+        overlap: int = 12,
     ):
         self.repository_path = Path(repository_path) if repository_path else None
         self.chunk_size = chunk_size
@@ -71,16 +71,15 @@ class CodeChunker:
             ext = file_path.suffix.lower()
             lang = ext.replace(".", "")
 
-            # Identify functions/classes line positions
-            current_symbol = ""
-            current_symbol_type = ""
-
             start = 0
             chunk_idx = 0
             while start < len(lines):
                 end = min(start + self.chunk_size, len(lines))
                 chunk_lines = lines[start:end]
                 chunk_text = "\n".join(chunk_lines)
+
+                current_symbol = ""
+                current_symbol_type = ""
 
                 # Detect symbol in this chunk
                 for cl in chunk_lines:

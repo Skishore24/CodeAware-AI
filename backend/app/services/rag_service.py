@@ -2,30 +2,32 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 from app.rag.chunker import CodeChunker
 from app.rag.retriever import HybridRetriever
+from app.ai.reasoner import CodeAwareReasoner
 
 
 class RAGService:
     """
     Repository-aware RAG service.
-    Manages indexing, chunk extraction, and hybrid multi-factor retrieval.
+    Manages semantic chunk indexing, multi-factor hybrid retrieval, and reasoning context generation.
     """
 
     def __init__(self):
         self.chunker = CodeChunker()
         self.retrievers: Dict[str, HybridRetriever] = {}
         self.repositories: Dict[str, Dict[str, Any]] = {}
+        self.reasoner = CodeAwareReasoner()
 
     def index_repository(
         self,
-        repository_path: str,
+        repository_path: str | Path,
         chunks: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
-        p = Path(repository_path)
+        p = Path(repository_path).resolve()
         if not p.exists():
             return {
                 "status": "failed",
-                "repository_path": repository_path,
-                "error": f"Path not found: {repository_path}"
+                "repository_path": str(p),
+                "error": f"Path not found: {p}"
             }
 
         if chunks is None:
@@ -51,21 +53,21 @@ class RAGService:
 
     def search(
         self,
-        repository_path: str,
+        repository_path: str | Path,
         query: str,
         top_k: int = 10,
         filters: Optional[Dict] = None
     ) -> Dict[str, Any]:
         if not query.strip():
-            return {"results": [], "chunks": [], "context": ""}
+            return {"results": [], "chunks": [], "context": "", "count": 0}
 
-        p_str = str(Path(repository_path))
+        p_str = str(Path(repository_path).resolve())
         if p_str not in self.retrievers:
             self.index_repository(p_str)
 
         retriever = self.retrievers.get(p_str)
         if not retriever:
-            return {"results": [], "chunks": [], "context": ""}
+            return {"results": [], "chunks": [], "context": "", "count": 0}
 
         results = retriever.retrieve(query=query, top_k=top_k, filters=filters)
         context = self._build_context(results)
@@ -75,6 +77,28 @@ class RAGService:
             "chunks": results,
             "context": context,
             "count": len(results)
+        }
+
+    def ask(
+        self,
+        repository_path: str | Path,
+        question: str,
+        top_k: int = 8
+    ) -> Dict[str, Any]:
+        search_res = self.search(repository_path=repository_path, query=question, top_k=top_k)
+        context = search_res.get("context", "")
+        chunks = search_res.get("chunks", [])
+
+        answer = self.reasoner.generate(prompt=question, context=context)
+        citations = self.reasoner.extract_citations(context)
+
+        return {
+            "success": True,
+            "question": question,
+            "answer": answer,
+            "citations": citations,
+            "chunks": chunks,
+            "count": len(chunks),
         }
 
     def _build_context(self, chunks: List[Dict[str, Any]]) -> str:

@@ -13,6 +13,13 @@ import {
   Clock,
   ArrowRight,
   Loader2,
+  Copy,
+  Check,
+  Zap,
+  Terminal,
+  Activity,
+  Layers,
+  Search,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runAgent } from "../api/agents";
@@ -26,6 +33,7 @@ export default function AgentChat() {
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState(null);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -36,20 +44,26 @@ export default function AgentChat() {
 
   const messagesEndRef = useRef(null);
 
+  const promptSuggestions = [
+    { label: "Audit OWASP Vulnerabilities", icon: ShieldAlert, prompt: "Perform a full security vulnerability scan and check for SQL injection, hardcoded secrets, and unsafe eval." },
+    { label: "Find Bugs & Anti-Patterns", icon: Bug, prompt: "Analyze the codebase for potential runtime bugs, uncaught exceptions, and bare except blocks." },
+    { label: "Architecture & Layer Review", icon: Layers, prompt: "Provide an architecture overview, mapping the API controllers, services, models, and dependencies." },
+    { label: "Impact & Blast Radius", icon: GitFork, prompt: "What is the blast radius and who calls authenticate_user?" },
+  ];
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  const handleSendMessage = async (customText) => {
+    const userPrompt = (customText || input).trim();
+    if (!userPrompt) return;
 
     if (!activeRepo) {
       addToast("Please select an active repository first.", "warning");
       return;
     }
 
-    const userPrompt = input.trim();
     setInput("");
 
     const newMsg = {
@@ -90,6 +104,13 @@ export default function AgentChat() {
     }
   };
 
+  const copyText = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    addToast("Response copied to clipboard", "info");
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
   return (
     <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)" }}>
       {/* Header */}
@@ -97,11 +118,11 @@ export default function AgentChat() {
         <div>
           <h1 className="page-title">Agent Chat & Intelligence</h1>
           <p className="page-subtitle">
-            Autonomous specialist agents collaborating across AST symbols, knowledge graphs, and RAG.
+            Autonomous multi-agent orchestration across AST symbols, knowledge graphs, and hybrid RAG.
           </p>
         </div>
         <div className="page-actions">
-          <span className="badge badge-primary">
+          <span className="badge badge-primary" style={{ padding: "4px 10px" }}>
             <Bot size={13} />
             <span>15 Specialist Agents Active</span>
           </span>
@@ -117,7 +138,7 @@ export default function AgentChat() {
           flexDirection: "column",
           padding: "var(--space-4)",
           overflowY: "auto",
-          marginBottom: "var(--space-4)",
+          marginBottom: "var(--space-3)",
           minHeight: 0,
         }}
       >
@@ -134,14 +155,14 @@ export default function AgentChat() {
                   gap: "12px",
                   alignItems: "flex-start",
                   alignSelf: isUser ? "flex-end" : "flex-start",
-                  maxWidth: isUser ? "75%" : "90%",
+                  maxWidth: isUser ? "75%" : "92%",
                 }}
               >
                 {!isUser && (
                   <div
                     style={{
-                      width: "32px",
-                      height: "32px",
+                      width: "36px",
+                      height: "36px",
                       borderRadius: "var(--radius-md)",
                       backgroundColor: "var(--primary-light)",
                       color: "var(--primary)",
@@ -149,39 +170,51 @@ export default function AgentChat() {
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
-                      marginTop: "2px",
+                      boxShadow: "var(--shadow-xs)",
                     }}
                   >
-                    <Bot size={18} />
+                    <Bot size={20} />
                   </div>
                 )}
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
                   <div
                     style={{
-                      padding: "12px 16px",
+                      padding: "14px 18px",
                       borderRadius: "var(--radius-lg)",
-                      backgroundColor: isUser ? "var(--primary)" : "var(--bg-subtle)",
+                      backgroundColor: isUser ? "var(--primary)" : "var(--bg-surface)",
                       color: isUser ? "white" : "var(--text-main)",
                       border: isUser ? "none" : "1px solid var(--border-color)",
+                      boxShadow: isUser ? "var(--shadow-xs)" : "var(--shadow-xs)",
                       fontSize: "14px",
                       lineHeight: "1.6",
                     }}
                   >
-                    {/* Assistant Metadata Badges */}
-                    {data && (
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
-                        <span className="badge badge-primary">
-                          Intent: {data.intent} ({Math.round((data.intent_confidence || 0.9) * 100)}%)
-                        </span>
-                        <span className="badge badge-neutral">
-                          Agent: {data.agent_name || "Orchestrator"}
-                        </span>
-                        {data.execution_duration_sec && (
-                          <span className="badge badge-neutral">
-                            <Clock size={11} /> {data.execution_duration_sec}s
+                    {/* Metadata header for Assistant */}
+                    {!isUser && data && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                          <span className="badge badge-primary">
+                            Intent: {data.intent} ({Math.round((data.intent_confidence || 0.9) * 100)}%)
                           </span>
-                        )}
+                          <span className="badge badge-purple">
+                            Agent: {data.agent_name || "Orchestrator"}
+                          </span>
+                          {data.execution_duration_sec && (
+                            <span className="badge badge-neutral">
+                              <Clock size={11} /> {data.execution_duration_sec}s
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: "2px 8px", fontSize: "11px" }}
+                          onClick={() => copyText(msg.text, idx)}
+                        >
+                          {copiedIdx === idx ? <Check size={12} color="var(--success)" /> : <Copy size={12} />}
+                          <span>{copiedIdx === idx ? "Copied" : "Copy"}</span>
+                        </button>
                       </div>
                     )}
 
@@ -189,25 +222,25 @@ export default function AgentChat() {
 
                     {/* Execution Timeline */}
                     {data?.timeline && data.timeline.length > 0 && (
-                      <div className="timeline" style={{ marginTop: "12px", backgroundColor: "#FFFFFF" }}>
-                        <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "4px" }}>
-                          EXECUTION TIMELINE
+                      <div className="timeline" style={{ marginTop: "14px", backgroundColor: "var(--bg-subtle)" }}>
+                        <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "4px" }}>
+                          MULTI-AGENT TIMELINE
                         </div>
                         {data.timeline.map((t, tIdx) => (
                           <div key={tIdx} className="timeline-step">
                             <span className={`timeline-dot ${t.status === "COMPLETED" ? "completed" : t.status === "FAILED" ? "failed" : "running"}`}></span>
-                            <span style={{ fontWeight: 500, color: "var(--text-main)" }}>{t.step}:</span>
+                            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>{t.step}:</span>
                             <span style={{ color: "var(--text-muted)" }}>{t.message}</span>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    {/* Citations & Evidence */}
+                    {/* Identified Citations */}
                     {data?.evidence && data.evidence.length > 0 && (
-                      <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--border-color)" }}>
-                        <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
-                          Identified Citations & Code Locations:
+                      <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px solid var(--border-color)" }}>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "6px" }}>
+                          Source Evidence & Citations:
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                           {data.evidence.map((ev, eIdx) => (
@@ -221,10 +254,15 @@ export default function AgentChat() {
 
                     {/* Chained Action Triggers */}
                     {data?.chained_results?.fix && (
-                      <div style={{ marginTop: "12px", padding: "10px", backgroundColor: "#EFF6FF", borderRadius: "6px", border: "1px solid #BFDBFE", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "13px", color: "#1E40AF", fontWeight: 500 }}>
-                          Proposed Patch Generated by FixAgent
-                        </span>
+                      <div style={{ marginTop: "14px", padding: "12px", backgroundColor: "var(--primary-light)", borderRadius: "var(--radius-md)", border: "1px solid var(--primary-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: "13.5px", color: "var(--primary)", fontWeight: 700 }}>
+                            Automated Patch Generated
+                          </div>
+                          <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                            FixAgent prepared a validated diff for review.
+                          </div>
+                        </div>
                         <button className="btn btn-primary btn-sm" onClick={() => navigate("/autonomous")}>
                           <Wrench size={13} />
                           <span>Review & Apply Patch</span>
@@ -232,6 +270,7 @@ export default function AgentChat() {
                       </div>
                     )}
                   </div>
+
                   <span style={{ fontSize: "11px", color: "var(--text-muted)", alignSelf: isUser ? "flex-end" : "flex-start" }}>
                     {msg.timestamp}
                   </span>
@@ -240,19 +279,18 @@ export default function AgentChat() {
                 {isUser && (
                   <div
                     style={{
-                      width: "32px",
-                      height: "32px",
+                      width: "36px",
+                      height: "36px",
                       borderRadius: "var(--radius-md)",
-                      backgroundColor: "#E2E8F0",
-                      color: "#475569",
+                      backgroundColor: "var(--bg-surface-active)",
+                      color: "var(--text-secondary)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
-                      marginTop: "2px",
                     }}
                   >
-                    <User size={18} />
+                    <User size={20} />
                   </div>
                 )}
               </div>
@@ -260,11 +298,11 @@ export default function AgentChat() {
           })}
 
           {loading && (
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", color: "var(--text-muted)" }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", color: "var(--text-muted)", padding: "10px" }}>
               <div
                 style={{
-                  width: "32px",
-                  height: "32px",
+                  width: "36px",
+                  height: "36px",
                   borderRadius: "var(--radius-md)",
                   backgroundColor: "var(--primary-light)",
                   color: "var(--primary)",
@@ -273,27 +311,48 @@ export default function AgentChat() {
                   justifyContent: "center",
                 }}
               >
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={20} className="animate-spin" />
               </div>
-              <span style={{ fontSize: "13.5px" }}>Orchestrating specialist agents and retrieving AST context...</span>
+              <span style={{ fontSize: "13.5px", fontWeight: 500 }}>
+                Coordinating specialist agents and synthesizing AST context...
+              </span>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
+      {/* Suggested Prompt Chips */}
+      <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px", marginBottom: "4px" }}>
+        {promptSuggestions.map((item, idx) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={idx}
+              className="btn btn-secondary btn-sm"
+              disabled={loading}
+              onClick={() => handleSendMessage(item.prompt)}
+              style={{ fontSize: "12px", whiteSpace: "nowrap" }}
+            >
+              <Icon size={13} color="var(--primary)" />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Input Box */}
-      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <input
           type="text"
           className="input"
-          placeholder="Ask a question, find a bug, audit security, or analyze impact..."
+          placeholder="Ask anything about the codebase, discover architecture, detect security flaws..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={loading}
           style={{ padding: "12px 16px", fontSize: "14px" }}
         />
-        <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()} style={{ padding: "12px 20px" }}>
+        <button type="submit" className="btn btn-primary btn-lg" disabled={loading || !input.trim()}>
           <Send size={16} />
           <span>Send</span>
         </button>

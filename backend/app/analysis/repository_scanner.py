@@ -1,18 +1,19 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 import os
 
 
 class RepositoryScanner:
     """
     Scans a cloned repository and collects structural information,
-    language distributions, entry points, detected frameworks, and file hierarchy.
+    language distributions, entry points, detected frameworks, test suites, and file hierarchy.
     """
 
     IGNORED_DIRECTORIES = {
         ".git", ".venv", "venv", "env", "node_modules", "__pycache__",
         ".idea", ".vscode", "dist", "build", "coverage", ".pytest_cache",
-        ".cache", ".next", ".nuxt", "out", "target", "bin", "obj"
+        ".cache", ".next", ".nuxt", "out", "target", "bin", "obj", ".tox",
+        "vendor", "pods", ".gradle"
     }
 
     IGNORED_EXTENSIONS = {
@@ -20,7 +21,8 @@ class RepositoryScanner:
         ".mp4", ".mov", ".avi", ".mp3", ".wav",
         ".zip", ".tar", ".gz", ".7z", ".rar",
         ".pyc", ".pyd", ".exe", ".dll", ".so", ".dylib", ".class",
-        ".lock", ".wasm", ".bin", ".env", ".env.local"
+        ".lock", ".wasm", ".bin", ".env", ".env.local", ".pdf",
+        ".woff", ".woff2", ".ttf", ".eot", ".map"
     }
 
     LANGUAGE_EXTENSIONS = {
@@ -63,7 +65,7 @@ class RepositoryScanner:
         "Dockerfile", "docker-compose.yml", "Makefile"
     }
 
-    def __init__(self, repository_path: Path):
+    def __init__(self, repository_path: Path | str):
         self.repository_path = Path(repository_path)
 
     def scan(self) -> Dict[str, Any]:
@@ -77,8 +79,9 @@ class RepositoryScanner:
         languages: Dict[str, int] = {}
         total_size_bytes = 0
         total_lines = 0
-        detected_frameworks = set()
-        entry_points = []
+        detected_frameworks: Set[str] = set()
+        entry_points: List[str] = []
+        test_files: List[str] = []
 
         for root, dirs, files in os.walk(self.repository_path):
             # Prune ignored directories
@@ -99,30 +102,40 @@ class RepositoryScanner:
                     lang = self.LANGUAGE_EXTENSIONS.get(ext, "Other")
                     languages[lang] = languages.get(lang, 0) + 1
 
-                    # Count lines for text code files
+                    # Identify test files
+                    if "test" in rel_path.lower() or "spec" in rel_path.lower():
+                        test_files.append(rel_path)
+
+                    # Count lines for text code files (<2MB)
                     file_lines = 0
-                    if size < 2 * 1024 * 1024:  # Under 2MB
+                    if size < 2 * 1024 * 1024:
                         try:
                             content = file_path.read_text(encoding="utf-8", errors="ignore")
                             file_lines = len(content.splitlines())
                             total_lines += file_lines
 
-                            # Detect frameworks from configuration files / imports
+                            # Framework detection
                             if file == "package.json":
                                 if "react" in content: detected_frameworks.add("React")
                                 if "vue" in content: detected_frameworks.add("Vue")
                                 if "next" in content: detected_frameworks.add("Next.js")
                                 if "express" in content: detected_frameworks.add("Express")
                                 if "vite" in content: detected_frameworks.add("Vite")
+                                if "tailwindcss" in content: detected_frameworks.add("TailwindCSS")
                             elif file in ("requirements.txt", "pyproject.toml", "setup.py"):
-                                if "fastapi" in content.lower(): detected_frameworks.add("FastAPI")
-                                if "django" in content.lower(): detected_frameworks.add("Django")
-                                if "flask" in content.lower(): detected_frameworks.add("Flask")
-                                if "torch" in content.lower() or "pytorch" in content.lower(): detected_frameworks.add("PyTorch")
-                                if "scikit-learn" in content.lower(): detected_frameworks.add("Scikit-Learn")
+                                low = content.lower()
+                                if "fastapi" in low: detected_frameworks.add("FastAPI")
+                                if "django" in low: detected_frameworks.add("Django")
+                                if "flask" in low: detected_frameworks.add("Flask")
+                                if "torch" in low or "pytorch" in low: detected_frameworks.add("PyTorch")
+                                if "scikit-learn" in low or "sklearn" in low: detected_frameworks.add("Scikit-Learn")
+                                if "sqlalchemy" in low: detected_frameworks.add("SQLAlchemy")
+                                if "pytest" in low: detected_frameworks.add("Pytest")
                             elif file == "go.mod":
                                 if "gin-gonic" in content: detected_frameworks.add("Gin")
                                 if "fiber" in content: detected_frameworks.add("Fiber")
+                            elif file == "pom.xml" or file == "build.gradle":
+                                if "spring" in content.lower(): detected_frameworks.add("Spring Boot")
                         except Exception:
                             pass
 
@@ -143,7 +156,6 @@ class RepositoryScanner:
                 except Exception:
                     continue
 
-        # Sort languages by count
         sorted_languages = sorted(languages.items(), key=lambda item: item[1], reverse=True)
         primary_language = sorted_languages[0][0] if sorted_languages else "Unknown"
 
@@ -158,6 +170,8 @@ class RepositoryScanner:
             "languages": {k: v for k, v in sorted_languages},
             "frameworks": sorted(list(detected_frameworks)),
             "entry_points": entry_points,
-            "files": files_list[:2000],  # Return up to 2000 files
+            "test_files_count": len(test_files),
+            "test_files": test_files[:20],
+            "files": files_list[:2000],
             "important_files": [f for f in files_list if f["is_important"]],
         }

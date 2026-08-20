@@ -8,7 +8,7 @@ from app.analysis.repository_scanner import RepositoryScanner
 class ArchitectureAgent(BaseAgent):
     """
     Analyzes project architecture, detected layers (frontend, backend, API, services, models, db),
-    coupling risks, and modular structure.
+    coupling risks, and modular structure. Supports both whole-repo and code snippet analysis.
     """
 
     name = "ArchitectureAgent"
@@ -17,6 +17,31 @@ class ArchitectureAgent(BaseAgent):
     def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         repository_path = input_data.get("repository_path")
         repository_name = input_data.get("repository_name")
+        code = input_data.get("code")
+        file_path = input_data.get("file_path", "snippet.py")
+
+        # Snippet-level analysis
+        if code and not repository_path and not repository_name:
+            lines = code.splitlines()
+            findings = []
+            has_api = any("get(" in l.lower() or "post(" in l.lower() or "route" in l.lower() for l in lines)
+            has_db = any("select" in l.lower() or "query" in l.lower() or "filter" in l.lower() for l in lines)
+            has_class = any("class " in l for l in lines)
+            
+            if has_api: findings.append({"layer": "API / Routes", "status": "Detected"})
+            if has_db: findings.append({"layer": "Data / Models / Database", "status": "Detected"})
+            if has_class: findings.append({"layer": "Domain Classes", "status": "Detected"})
+            
+            return self.create_response(
+                success=True,
+                confidence=0.90,
+                summary=f"Architecture analysis for '{file_path}': Analyzed {len(lines)} lines of source code.",
+                findings=findings,
+                files=[file_path],
+                recommendations=["Keep controller logic lean by delegating domain operations to dedicated services."],
+                evidence=[{"total_lines": len(lines)}],
+                next_actions=["Extract domain services", "Add interface boundaries"]
+            )
 
         if not repository_path and repository_name:
             repository_path = str(Path(CLONED_REPOSITORIES_DIR) / repository_name)

@@ -19,7 +19,9 @@ class HybridRetriever:
         if not self.documents:
             return []
 
-        query_lower = query.lower()
+        query_lower = query.lower().strip()
+        query_words = [w for w in re_split(query_lower) if len(w) > 2]
+
         keyword_results = self.keyword_search.search(query, top_k=top_k * 3)
         vector_results = self.vector_store.search(query, top_k=top_k * 3)
 
@@ -40,21 +42,22 @@ class HybridRetriever:
         for doc in combined.values():
             file_name = doc.get("file", "").lower()
             symbol = (doc.get("symbol") or "").lower()
-            content = (doc.get("content") or "").lower()
+            raw_code = (doc.get("raw_code") or doc.get("content", "")).lower()
 
             kw_s = doc.get("keyword_score", 0.0)
             vec_s = doc.get("vector_score", 0.0)
 
             # Boosts
-            symbol_boost = 0.35 if (symbol and symbol in query_lower) else 0.0
-            path_boost = 0.20 if any(part in file_name for part in query_lower.split() if len(part) > 3) else 0.0
+            symbol_boost = 0.40 if (symbol and symbol in query_lower) else 0.0
+            path_boost = 0.25 if any(part in file_name for part in query_words) else 0.0
+            exact_phrase_boost = 0.30 if query_lower in raw_code else 0.0
 
-            final_score = (kw_s * 0.35) + (vec_s * 0.45) + symbol_boost + path_boost
+            final_score = (kw_s * 0.30) + (vec_s * 0.40) + symbol_boost + path_boost + exact_phrase_boost
             doc["retrieval_score"] = round(final_score, 4)
             doc["score"] = doc["retrieval_score"]
             doc["text"] = doc.get("raw_code", doc.get("content", ""))
 
-            # Filter checking
+            # Filters
             if filters:
                 lang_f = filters.get("language")
                 if lang_f and doc.get("language", "").lower() != lang_f.lower():
@@ -62,8 +65,16 @@ class HybridRetriever:
                 path_f = filters.get("file_path")
                 if path_f and path_f.lower() not in file_name:
                     continue
+                sym_f = filters.get("symbol")
+                if sym_f and sym_f.lower() not in symbol:
+                    continue
 
             ranked.append(doc)
 
         ranked.sort(key=lambda x: x["retrieval_score"], reverse=True)
         return ranked[:top_k]
+
+
+def re_split(text: str) -> List[str]:
+    import re
+    return re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", text)

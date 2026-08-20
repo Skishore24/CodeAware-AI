@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from app.graph.code_knowledge_graph import CodeKnowledgeGraph
 
 
@@ -30,12 +30,12 @@ class ImpactAnalyzer:
                 "blast_radius_score": "LOW",
                 "risk_level": "LOW",
                 "count": 0,
-                "summary": f"No symbol matching '{symbol}' found in knowledge graph."
+                "summary": f"No symbol matching '{symbol}' found in repository knowledge graph."
             }
 
         direct_callers = []
         indirect_callers = []
-        dependent_files = set()
+        dependent_files: Set[str] = set()
         affected_apis = []
         potentially_broken_tests = []
         all_impact = []
@@ -80,11 +80,11 @@ class ImpactAnalyzer:
                         indirect_callers.append(item)
 
                     # Classify APIs / Routes
-                    if "api" in ppath.lower() or "route" in ppath.lower() or "endpoint" in pname.lower():
+                    if any(kw in ppath.lower() or kw in pname.lower() for kw in ["api", "route", "controller", "endpoint", "view"]):
                         affected_apis.append(item)
 
                     # Classify Tests
-                    if "test" in ppath.lower() or "test_" in pname.lower():
+                    if any(kw in ppath.lower() or kw in pname.lower() for kw in ["test", "spec", "test_"]):
                         potentially_broken_tests.append(item)
 
                     queue.append((predecessor, current_depth + 1))

@@ -1,13 +1,14 @@
 import ast
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
 class PythonASTAnalyzer:
     """
-    Analyzes Python source code using Python's built-in AST module.
-    Extracts classes, methods, functions, async functions, imports, docstrings, and call graphs.
+    Advanced Python AST Analyzer for CodeAware AI.
+    Extracts classes, methods, functions, async functions, decorators, API routes,
+    database operations, imports, docstrings, parameters with type hints, returns, and call graphs.
     """
 
     def __init__(self, file_path: Path):
@@ -31,21 +32,33 @@ class PythonASTAnalyzer:
                 "column": exc.offset,
             }
 
-    def get_parameters(self, node: Any) -> List[str]:
+    def get_parameters(self, node: Any) -> List[Dict[str, Any]]:
         parameters = []
         if hasattr(node, "args") and hasattr(node.args, "args"):
             for argument in node.args.args:
-                parameters.append(argument.arg)
+                type_hint = ""
+                if argument.annotation:
+                    try:
+                        type_hint = ast.unparse(argument.annotation)
+                    except Exception:
+                        type_hint = "Any"
+                parameters.append({
+                    "name": argument.arg,
+                    "type_hint": type_hint
+                })
         return parameters
 
-    def get_calls(self, node: ast.AST) -> List[str]:
-        calls = []
-        for child in ast.walk(node):
-            if isinstance(child, ast.Call):
-                function_name = self.get_node_name(child.func)
-                if function_name:
-                    calls.append(function_name)
-        return sorted(list(set(calls)))
+    def get_decorators(self, node: Any) -> List[str]:
+        decorators = []
+        if hasattr(node, "decorator_list"):
+            for dec in node.decorator_list:
+                try:
+                    decorators.append(ast.unparse(dec))
+                except Exception:
+                    name = self.get_node_name(dec)
+                    if name:
+                        decorators.append(name)
+        return decorators
 
     def get_node_name(self, node: ast.AST) -> str:
         if isinstance(node, ast.Name):
@@ -59,7 +72,18 @@ class PythonASTAnalyzer:
             if isinstance(current, ast.Name):
                 parts.append(current.id)
             return ".".join(reversed(parts))
+        if isinstance(node, ast.Call):
+            return self.get_node_name(node.func)
         return ""
+
+    def get_calls(self, node: ast.AST) -> List[str]:
+        calls = []
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                name = self.get_node_name(child.func)
+                if name:
+                    calls.append(name)
+        return sorted(list(set(calls)))
 
     def get_returns(self, node: ast.AST) -> List[str]:
         returns = []
@@ -68,38 +92,61 @@ class PythonASTAnalyzer:
                 if child.value is None:
                     returns.append("None")
                 else:
-                    val_name = self.get_node_name(child.value)
-                    if val_name:
-                        returns.append(val_name)
-                    else:
-                        try:
-                            returns.append(ast.unparse(child.value))
-                        except Exception:
-                            returns.append("value")
-        return returns
+                    try:
+                        returns.append(ast.unparse(child.value))
+                    except Exception:
+                        val_name = self.get_node_name(child.value)
+                        returns.append(val_name or "value")
+        return sorted(list(set(returns)))
 
-    def analyze_function(self, node: ast.FunctionDef) -> Dict[str, Any]:
+    def detect_api_route(self, decorators: List[str]) -> Optional[Dict[str, Any]]:
+        for dec in decorators:
+            dec_lower = dec.lower()
+            if any(method in dec_lower for method in ["get(", "post(", "put(", "delete(", "patch(", "route(", "api_view"]):
+                # Extract HTTP method and route path if possible
+                method_match = re.search(r"\b(get|post|put|delete|patch)\b", dec_lower)
+                path_match = re.search(r"[\"'](/[^\"']*)[\"']", dec)
+                return {
+                    "is_api_route": True,
+                    "method": method_match.group(1).upper() if method_match else "GET",
+                    "path": path_match.group(1) if path_match else "/",
+                    "decorator": dec
+                }
+        return None
+
+    def detect_database_ops(self, node: ast.AST) -> List[Dict[str, Any]]:
+        ops = []
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                call_name = self.get_node_name(child.func).lower()
+                if any(kw in call_name for kw in ["filter", "query", "execute", "select", "insert", "update", "delete", "fetchall", "fetchone", "commit", "objects.get", "objects.all"]):
+                    ops.append({
+                        "operation": call_name,
+                        "line": getattr(child, "lineno", 1)
+                    })
+        return ops
+
+    def analyze_function(self, node: Any, is_async: bool = False) -> Dict[str, Any]:
+        decorators = self.get_decorators(node)
+        api_route = self.detect_api_route(decorators)
+        db_ops = self.detect_database_ops(node)
+        docstring = ast.get_docstring(node) or ""
+
         return {
             "name": node.name,
-            "type": "function",
+            "type": "async_function" if is_async else "function",
             "line": node.lineno,
             "end_line": getattr(node, "end_lineno", node.lineno),
-            "docstring": ast.get_docstring(node) or "",
-            "parameters": self.get_parameters(node),
+            "docstring": docstring,
+            "decorators": decorators,
+            "parameters": [p["name"] for p in self.get_parameters(node)],
+            "parameters_detailed": self.get_parameters(node),
             "calls": self.get_calls(node),
             "returns": self.get_returns(node),
-        }
-
-    def analyze_async_function(self, node: ast.AsyncFunctionDef) -> Dict[str, Any]:
-        return {
-            "name": node.name,
-            "type": "async_function",
-            "line": node.lineno,
-            "end_line": getattr(node, "end_lineno", node.lineno),
-            "docstring": ast.get_docstring(node) or "",
-            "parameters": self.get_parameters(node),
-            "calls": self.get_calls(node),
-            "returns": self.get_returns(node),
+            "api_route": api_route,
+            "database_operations": db_ops,
+            "is_api_endpoint": api_route is not None,
+            "has_db_operations": len(db_ops) > 0,
         }
 
     def analyze_class(self, node: ast.ClassDef) -> Dict[str, Any]:
@@ -112,17 +159,21 @@ class PythonASTAnalyzer:
 
         for item in node.body:
             if isinstance(item, ast.FunctionDef):
-                methods.append(self.analyze_function(item))
+                methods.append(self.analyze_function(item, is_async=False))
             elif isinstance(item, ast.AsyncFunctionDef):
-                methods.append(self.analyze_async_function(item))
+                methods.append(self.analyze_function(item, is_async=True))
+
+        decorators = self.get_decorators(node)
+        docstring = ast.get_docstring(node) or ""
 
         return {
             "name": node.name,
             "type": "class",
             "line": node.lineno,
             "end_line": getattr(node, "end_lineno", node.lineno),
-            "docstring": ast.get_docstring(node) or "",
+            "docstring": docstring,
             "bases": bases,
+            "decorators": decorators,
             "methods": methods,
         }
 
@@ -161,19 +212,31 @@ class PythonASTAnalyzer:
                 "classes": [],
                 "functions": [],
                 "imports": [],
+                "api_endpoints": [],
             }
 
         classes = []
         functions = []
         imports = []
+        api_endpoints = []
 
         for node in getattr(tree, "body", []):
             if isinstance(node, ast.ClassDef):
-                classes.append(self.analyze_class(node))
+                cls_data = self.analyze_class(node)
+                classes.append(cls_data)
+                for m in cls_data.get("methods", []):
+                    if m.get("is_api_endpoint"):
+                        api_endpoints.append({**m, "class": cls_data["name"]})
             elif isinstance(node, ast.FunctionDef):
-                functions.append(self.analyze_function(node))
+                fn_data = self.analyze_function(node, is_async=False)
+                functions.append(fn_data)
+                if fn_data.get("is_api_endpoint"):
+                    api_endpoints.append(fn_data)
             elif isinstance(node, ast.AsyncFunctionDef):
-                functions.append(self.analyze_async_function(node))
+                fn_data = self.analyze_function(node, is_async=True)
+                functions.append(fn_data)
+                if fn_data.get("is_api_endpoint"):
+                    api_endpoints.append(fn_data)
             elif isinstance(node, ast.Import):
                 imports.extend(self.analyze_import(node))
             elif isinstance(node, ast.ImportFrom):
@@ -185,13 +248,14 @@ class PythonASTAnalyzer:
             "classes": classes,
             "functions": functions,
             "imports": imports,
+            "api_endpoints": api_endpoints,
         }
 
 
 class GenericCodeAnalyzer:
     """
-    Fallback structural symbol analyzer for JavaScript, TypeScript, Go, Java, C++, C#.
-    Uses regex patterns to extract classes, functions, and import declarations.
+    Structural symbol and reference analyzer for JavaScript, TypeScript, Go, Java, C++, C#.
+    Uses robust regular expressions to extract classes, functions, parameters, imports, and calls.
     """
 
     def __init__(self, file_path: Path):
@@ -206,7 +270,8 @@ class GenericCodeAnalyzer:
                 "language": "unknown",
                 "classes": [],
                 "functions": [],
-                "imports": []
+                "imports": [],
+                "api_endpoints": []
             }
 
         ext = self.file_path.suffix.lower()
@@ -220,15 +285,21 @@ class GenericCodeAnalyzer:
             ".cpp": "cpp",
             ".c": "c",
             ".cs": "csharp",
+            ".rs": "rust",
+            ".php": "php",
+            ".rb": "ruby",
         }.get(ext, "unknown")
 
         classes = []
         functions = []
         imports = []
+        api_endpoints = []
 
         lines = source.splitlines()
         for idx, line in enumerate(lines, 1):
             sline = line.strip()
+            if not sline or sline.startswith("//") or sline.startswith("/*") or sline.startswith("*"):
+                continue
 
             # Class declarations
             class_match = re.search(r"\bclass\s+([A-Za-z0-9_]+)(?:\s+extends\s+([A-Za-z0-9_]+))?", sline)
@@ -242,24 +313,30 @@ class GenericCodeAnalyzer:
                 })
                 continue
 
-            # Function declarations (JS/TS/Go/Java)
+            # Function declarations (JS/TS/Go/Java/C#/Rust)
             fn_match = re.search(
-                r"(?:function\s+([A-Za-z0-9_]+)|(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|func\s+(?:\([^)]+\)\s*)?([A-Za-z0-9_]+)|public\s+(?:static\s+)?[\w<>[\]]+\s+([A-Za-z0-9_]+)\s*\()",
+                r"(?:function\s+([A-Za-z0-9_]+)|(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|func\s+(?:\([^)]+\)\s*)?([A-Za-z0-9_]+)|(?:public|private|protected)?\s+(?:static\s+)?(?:async\s+)?[\w<>[\]]+\s+([A-Za-z0-9_]+)\s*\(|fn\s+([A-Za-z0-9_]+))",
                 sline
             )
             if fn_match:
                 fn_name = next(g for g in fn_match.groups() if g is not None)
-                functions.append({
-                    "name": fn_name,
-                    "type": "function",
-                    "line": idx,
-                    "parameters": [],
-                    "calls": []
-                })
+                if fn_name not in ("if", "for", "while", "switch", "catch"):
+                    # Check for API endpoint decorators / routing patterns in JS/TS/Go
+                    is_route = any(r in sline.lower() for r in ["app.get", "app.post", "router.get", "router.post", "@get", "@post"])
+                    fn_entry = {
+                        "name": fn_name,
+                        "type": "function",
+                        "line": idx,
+                        "parameters": [],
+                        "calls": []
+                    }
+                    functions.append(fn_entry)
+                    if is_route:
+                        api_endpoints.append(fn_entry)
                 continue
 
             # Imports
-            if sline.startswith("import ") or sline.startswith("from ") or "require(" in sline:
+            if sline.startswith("import ") or sline.startswith("from ") or "require(" in sline or sline.startswith("package ") or sline.startswith("using "):
                 imports.append({
                     "type": "import",
                     "statement": sline,
@@ -272,4 +349,5 @@ class GenericCodeAnalyzer:
             "classes": classes,
             "functions": functions,
             "imports": imports,
+            "api_endpoints": api_endpoints,
         }

@@ -18,6 +18,8 @@ from app.agents.git_agent import GitAgent
 from app.agents.validation_agent import ValidationAgent
 
 from app.ml.intent_classifier import IntentClassifier
+from app.services.rag_service import RAGService
+from app.services.graph_service import GraphService
 
 
 class CodeAwareOrchestrator:
@@ -28,14 +30,18 @@ class CodeAwareOrchestrator:
     """
 
     def __init__(self):
+        # Shared core services
+        self.rag_service = RAGService()
+        self.graph_service = GraphService()
+
         # Specialist Agents
         self.repository_agent = RepositoryAgent()
-        self.search_agent = SearchAgent()
-        self.rag_agent = RAGAgent()
+        self.search_agent = SearchAgent(rag_service=self.rag_service)
+        self.rag_agent = RAGAgent(rag_service=self.rag_service)
         self.code_agent = CodeAgent()
         self.bug_agent = BugAgent()
         self.security_agent = SecurityAgent()
-        self.impact_agent = ImpactAgent()
+        self.impact_agent = ImpactAgent(graph_service=self.graph_service)
         self.test_agent = TestAgent()
         self.fix_agent = FixAgent()
         self.documentation_agent = DocumentationAgent()
@@ -59,8 +65,8 @@ class CodeAwareOrchestrator:
             return {
                 "success": False,
                 "intent": None,
-                "summary": "Task is required.",
-                "timeline": [{"step": "Validation", "status": "FAILED", "message": "Empty task provided."}]
+                "summary": "Task query is required.",
+                "timeline": [{"step": "Validation", "status": "FAILED", "message": "Empty task query provided."}]
             }
 
         timeline: List[Dict[str, Any]] = []
@@ -115,7 +121,10 @@ class CodeAwareOrchestrator:
 
             elif primary_intent == "impact_analysis":
                 timeline.append({"step": "Knowledge Graph Traversal", "status": "RUNNING", "timestamp": round(time.time() - start_time, 3)})
-                agent_result = self.impact_agent.run(agent_data)
+                # Extract symbol if possible from query
+                words = task.split()
+                symbol_candidate = words[-1].strip("?.,'\"") if words else ""
+                agent_result = self.impact_agent.run({**agent_data, "symbol": agent_data.get("symbol") or symbol_candidate})
                 timeline[-1]["status"] = "COMPLETED"
 
             elif primary_intent == "security_analysis":

@@ -8,7 +8,7 @@ from app.config.settings import CLONED_REPOSITORIES_DIR
 class PerformanceAgent(BaseAgent):
     """
     Analyzes code for performance bottlenecks, N+1 query patterns,
-    heavy synchronous operations, unindexed searches, and memory leaks.
+    heavy synchronous operations in async routines, unindexed searches, and memory leaks.
     """
 
     name = "PerformanceAgent"
@@ -18,26 +18,27 @@ class PerformanceAgent(BaseAgent):
         {
             "id": "PERF-001",
             "type": "n_plus_one_query",
-            "pattern": r"for\s+\w+\s+in\s+.*:\s*\n\s*(?:.*\.query\(|.*\.filter\(|.*\.execute\(|.*\.find\()",
+            "pattern": r"(?:query\(|filter\(|execute\(|find\()",
+            "condition": "in_loop",
             "message": "Potential N+1 query pattern: database query executed inside a loop.",
             "severity": "HIGH",
             "recommendation": "Batch database queries using IN clauses, joins, or prefetch_related."
         },
         {
             "id": "PERF-002",
-            "type": "blocking_io_in_async",
-            "pattern": r"async\s+def\s+.*:\s*(?:[\s\S]*?)(?:time\.sleep\(|requests\.(?:get|post)|open\()",
-            "message": "Synchronous blocking call inside async function blocks event loop.",
-            "severity": "HIGH",
-            "recommendation": "Use asyncio.sleep, httpx.AsyncClient, or aiofiles for non-blocking execution."
+            "type": "blocking_sleep",
+            "pattern": r"time\.sleep\(",
+            "message": "Synchronous time.sleep blocks execution thread.",
+            "severity": "MEDIUM",
+            "recommendation": "Use non-blocking asynchronous timers or background jobs."
         },
         {
             "id": "PERF-003",
             "type": "repeated_string_concat",
-            "pattern": r"\b\w+\s*\+=\s*['\"][^'\"]+['\"]\s*\n\s*\w+\s*\+=",
-            "message": "Repeated string concatenation inside loops creates quadratic memory allocation.",
+            "pattern": r"\b\w+\s*\+=\s*str\(|\b\w+\s*\+=\s*['\"]",
+            "message": "Repeated string concatenation in iterations creates quadratic memory allocation.",
             "severity": "LOW",
-            "recommendation": "Accumulate elements into a list and use ''.join(list) or StringBuilder."
+            "recommendation": "Accumulate elements into a list and use ''.join(list) or io.StringIO."
         },
         {
             "id": "PERF-004",

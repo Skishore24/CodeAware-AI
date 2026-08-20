@@ -9,6 +9,10 @@ import {
   Check,
   Loader2,
   RotateCcw,
+  Sparkles,
+  Layers,
+  ArrowRight,
+  ShieldAlert,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runAutonomousWorkflow, approveFix } from "../api/autonomous";
@@ -25,8 +29,15 @@ export default function AutonomousFix() {
   const [result, setResult] = useState(null);
   const [applied, setApplied] = useState(false);
 
+  const problemTemplates = [
+    "Replace bare except: block with explicit Exception handling and logging",
+    "Fix unsafe eval() / exec() call with safe deserialization",
+    "Add null and undefined check before accessing object properties",
+    "Add retry mechanism and error handling for external network requests",
+  ];
+
   const handleAnalyzeAndFix = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!filePath.trim() || !problem.trim()) {
       addToast("Target file and problem description are required.", "warning");
       return;
@@ -51,7 +62,7 @@ export default function AutonomousFix() {
 
       setResult(data);
       if (data?.success) {
-        addToast("Proposed patch and validation completed.", "success");
+        addToast("Proposed patch and regression test generated successfully.", "success");
       } else {
         addToast(data?.error || "Fix generation failed.", "error");
       }
@@ -97,7 +108,7 @@ export default function AutonomousFix() {
         <div>
           <h1 className="page-title">Autonomous Fix & Safe Patching</h1>
           <p className="page-subtitle">
-            Targeted source-code patch generation, unified diff inspection, and test-verified safe application.
+            Autonomous patch synthesis, unified diff inspection, isolated syntax/test validation, and human-approved application.
           </p>
         </div>
       </div>
@@ -111,7 +122,7 @@ export default function AutonomousFix() {
 
         <form onSubmit={handleAnalyzeAndFix} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           <div>
-            <label style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+            <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
               Target File Path (relative to repository root)
             </label>
             <input
@@ -121,11 +132,12 @@ export default function AutonomousFix() {
               value={filePath}
               onChange={(e) => setFilePath(e.target.value)}
               disabled={loading}
+              style={{ padding: "10px 12px" }}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+            <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
               Problem Description / Bug Symptoms
             </label>
             <textarea
@@ -135,14 +147,32 @@ export default function AutonomousFix() {
               value={problem}
               onChange={(e) => setProblem(e.target.value)}
               disabled={loading}
-              style={{ resize: "vertical" }}
+              style={{ resize: "vertical", padding: "10px 12px" }}
             />
           </div>
 
+          {/* Quick Problem Templates */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>
+              Quick Templates:
+            </span>
+            {problemTemplates.map((tmpl, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "var(--radius-full)" }}
+                onClick={() => setProblem(tmpl)}
+              >
+                {tmpl.slice(0, 38)}...
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button type="submit" className="btn btn-primary" disabled={loading || !filePath.trim() || !problem.trim()}>
+            <button type="submit" className="btn btn-primary btn-lg" disabled={loading || !filePath.trim() || !problem.trim()}>
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-              <span>{loading ? "Analyzing & Generating Patch..." : "Analyze & Propose Patch"}</span>
+              <span>{loading ? "Synthesizing & Validating Patch..." : "Analyze & Propose Patch"}</span>
             </button>
           </div>
         </form>
@@ -155,21 +185,24 @@ export default function AutonomousFix() {
           <div className="card">
             <div className="card-header">
               <div>
-                <h3 className="card-title">Step 2: Proposed Patch & Validation Status</h3>
+                <h3 className="card-title" style={{ fontSize: "16px" }}>
+                  <ShieldCheck size={18} color="var(--success)" />
+                  <span>Step 2: Proposed Patch & Validation Status</span>
+                </h3>
                 <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "2px" }}>
                   {result.fix_summary}
                 </div>
               </div>
-              <span className={`badge ${result.is_validated ? "badge-success" : "badge-warning"}`}>
+              <span className={`badge ${result.is_validated ? "badge-success" : "badge-warning"}`} style={{ fontSize: "12.5px", padding: "4px 10px" }}>
                 {result.is_validated ? "Validation Passed" : "Validation Warning"}
               </span>
             </div>
 
-            <div className="timeline" style={{ margin: "var(--space-3) 0" }}>
+            <div className="timeline" style={{ margin: "var(--space-3) 0", backgroundColor: "var(--bg-subtle)" }}>
               {result.steps?.map((s, idx) => (
                 <div key={idx} className="timeline-step">
                   <span className={`timeline-dot ${s.status === "PASSED" || s.status === "COMPLETED" ? "completed" : "failed"}`}></span>
-                  <span style={{ fontWeight: 600 }}>{s.step}:</span>
+                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>{s.step}:</span>
                   <span style={{ color: "var(--text-muted)" }}>Agent: {s.agent} ({s.status})</span>
                 </div>
               ))}
@@ -183,7 +216,7 @@ export default function AutonomousFix() {
                 <FileCode size={18} color="var(--primary)" />
                 <span>Step 3: Unified Diff Preview</span>
               </h3>
-              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Never automatically overwrites without approval</span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Never overwrites workspace file without explicit approval</span>
             </div>
 
             <div className="diff-container" style={{ maxHeight: "400px", overflowY: "auto" }}>
@@ -203,10 +236,10 @@ export default function AutonomousFix() {
 
             {/* Approval Controls */}
             <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: "12.5px", color: "var(--text-muted)" }}>
+              <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                 {applied ? (
-                  <span style={{ color: "var(--success)", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
-                    <CheckCircle2 size={16} /> Patch applied to workspace file.
+                  <span style={{ color: "var(--success)", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <CheckCircle2 size={16} /> Patch successfully applied to workspace file with backup.
                   </span>
                 ) : (
                   "Confirm that the diff solves the problem before applying changes."
@@ -214,7 +247,7 @@ export default function AutonomousFix() {
               </div>
 
               {!applied && (
-                <button className="btn btn-primary" onClick={handleApplyFix} disabled={applying}>
+                <button className="btn btn-primary btn-lg" onClick={handleApplyFix} disabled={applying}>
                   {applying ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                   <span>{applying ? "Applying Patch..." : "Approve & Apply Patch"}</span>
                 </button>

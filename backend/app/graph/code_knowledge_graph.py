@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 import ast
 import re
 import networkx as nx
@@ -7,19 +7,31 @@ import networkx as nx
 
 class CodeKnowledgeGraph:
     """
-    Knowledge graph representing relationships
-    between repositories, files, classes, functions, and imports.
-
-    Node types: repository, file, class, function, module
-    Edge types: contains, imports, calls, defines, inherits
+    Advanced Knowledge Graph representing structural dependencies and call-graphs across a repository.
+    
+    Node types:
+      - repository: Root codebase
+      - file: Source file
+      - class: Class definition
+      - function: Function or method
+      - module: Imported module / package
+      - endpoint: API route definition
+    
+    Edge types:
+      - contains: Structural containment (repo -> file, class -> method)
+      - defines: Symbol declaration (file -> class, file -> function)
+      - imports: Dependency import (file -> module)
+      - calls: Invocation relationship (function -> function, method -> method)
+      - inherits: Class inheritance (class -> class)
+      - routes_to: API endpoint binding (endpoint -> function)
     """
 
     SUPPORTED_EXTENSIONS = {
-        ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".cpp", ".c", ".cs"
+        ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".cpp", ".c", ".cs", ".rs"
     }
 
     IGNORED_DIRS = {
-        ".git", "venv", ".venv", "__pycache__", "node_modules", "dist", "build", ".cache", ".idea", ".vscode"
+        ".git", "venv", ".venv", "__pycache__", "node_modules", "dist", "build", ".cache", ".idea", ".vscode", ".pytest_cache"
     }
 
     def __init__(self):
@@ -28,7 +40,7 @@ class CodeKnowledgeGraph:
     def clear(self):
         self.graph.clear()
 
-    def build(self, repository_path: str) -> Dict[str, Any]:
+    def build(self, repository_path: str | Path) -> Dict[str, Any]:
         self.clear()
         repository = Path(repository_path)
 
@@ -79,8 +91,7 @@ class CodeKnowledgeGraph:
         except Exception:
             return
 
-        # Top-level functions & classes
-        for node in tree.body:
+        for node in getattr(tree, "body", []):
             if isinstance(node, ast.ClassDef):
                 class_id = f"class:{relative_path}:{node.name}"
                 self.graph.add_node(
@@ -92,18 +103,24 @@ class CodeKnowledgeGraph:
                 )
                 self.graph.add_edge(file_id, class_id, type="defines")
 
+                for base in node.bases:
+                    base_name = self._get_node_name(base)
+                    if base_name:
+                        self.graph.add_edge(class_id, f"class:{base_name}", type="inherits")
+
                 for item in node.body:
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        func_id = f"function:{relative_path}:{node.name}.{item.name}"
+                        method_name = f"{node.name}.{item.name}"
+                        func_id = f"function:{relative_path}:{method_name}"
                         self.graph.add_node(
                             func_id,
                             type="function",
-                            name=f"{node.name}.{item.name}",
+                            name=method_name,
                             file=relative_path,
                             line=item.lineno
                         )
                         self.graph.add_edge(class_id, func_id, type="contains")
-                        self._extract_calls(item, func_id)
+                        self._extract_python_calls(item, func_id)
 
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 func_id = f"function:{relative_path}:{node.name}"
@@ -115,29 +132,33 @@ class CodeKnowledgeGraph:
                     line=node.lineno
                 )
                 self.graph.add_edge(file_id, func_id, type="defines")
-                self._extract_calls(node, func_id)
+                self._extract_python_calls(node, func_id)
 
-            elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        mod_id = f"module:{alias.name}"
-                        self.graph.add_node(mod_id, type="module", name=alias.name)
-                        self.graph.add_edge(file_id, mod_id, type="imports")
-                elif isinstance(node, ast.ImportFrom):
-                    mod_name = node.module or ""
-                    mod_id = f"module:{mod_name}"
-                    self.graph.add_node(mod_id, type="module", name=mod_name)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    mod_id = f"module:{alias.name}"
+                    self.graph.add_node(mod_id, type="module", name=alias.name)
                     self.graph.add_edge(file_id, mod_id, type="imports")
 
-    def _extract_calls(self, node: ast.AST, caller_id: str):
+            elif isinstance(node, ast.ImportFrom):
+                mod_name = node.module or ""
+                mod_id = f"module:{mod_name}"
+                self.graph.add_node(mod_id, type="module", name=mod_name)
+                self.graph.add_edge(file_id, mod_id, type="imports")
+
+    def _get_node_name(self, node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return f"{self._get_node_name(node.value)}.{node.attr}"
+        return ""
+
+    def _extract_python_calls(self, node: ast.AST, caller_id: str):
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
-                name = None
-                if isinstance(child.func, ast.Name):
-                    name = child.func.id
-                elif isinstance(child.func, ast.Attribute):
-                    name = child.func.attr
+                name = self._get_node_name(child.func)
                 if name:
+                    # Match against existing or target function symbols
                     for n, data in self.graph.nodes(data=True):
                         if data.get("type") == "function" and (data.get("name") == name or data.get("name", "").endswith(f".{name}")):
                             self.graph.add_edge(caller_id, n, type="calls")
@@ -164,7 +185,8 @@ class CodeKnowledgeGraph:
         lines = source.splitlines()
         for idx, line in enumerate(lines, 1):
             sline = line.strip()
-            fn_match = re.search(r"(?:function\s+([A-Za-z0-9_]+)|(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|func\s+(?:\([^)]+\)\s*)?([A-Za-z0-9_]+))", sline)
+            # Functions
+            fn_match = re.search(r"(?:function\s+([A-Za-z0-9_]+)|(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|func\s+(?:\([^)]+\)\s*)?([A-Za-z0-9_]+)|fn\s+([A-Za-z0-9_]+))", sline)
             if fn_match:
                 fn_name = next(g for g in fn_match.groups() if g is not None)
                 func_id = f"function:{relative_path}:{fn_name}"
@@ -177,6 +199,7 @@ class CodeKnowledgeGraph:
                 )
                 self.graph.add_edge(file_id, func_id, type="defines")
 
+            # Classes
             class_match = re.search(r"\bclass\s+([A-Za-z0-9_]+)", sline)
             if class_match:
                 cls_name = class_match.group(1)
@@ -192,7 +215,7 @@ class CodeKnowledgeGraph:
 
     def find_symbol(self, symbol: str) -> List[Dict[str, Any]]:
         matches = []
-        sym_lower = symbol.lower()
+        sym_lower = symbol.lower().strip()
         for node_id, data in self.graph.nodes(data=True):
             name = data.get("name", "")
             if name.lower() == sym_lower or name.lower().endswith(f".{sym_lower}"):
@@ -205,8 +228,36 @@ class CodeKnowledgeGraph:
                 })
         return matches
 
+    def get_callers(self, node_id: str) -> List[Dict[str, Any]]:
+        callers = []
+        for predecessor in self.graph.predecessors(node_id):
+            edge = self.graph.get_edge_data(predecessor, node_id) or {}
+            data = self.graph.nodes.get(predecessor, {})
+            callers.append({
+                "id": predecessor,
+                "name": data.get("name", predecessor),
+                "type": data.get("type", "unknown"),
+                "file": data.get("file") or data.get("path", ""),
+                "relationship": edge.get("type", "relies_on")
+            })
+        return callers
+
+    def get_callees(self, node_id: str) -> List[Dict[str, Any]]:
+        callees = []
+        for successor in self.graph.successors(node_id):
+            edge = self.graph.get_edge_data(node_id, successor) or {}
+            data = self.graph.nodes.get(successor, {})
+            callees.append({
+                "id": successor,
+                "name": data.get("name", successor),
+                "type": data.get("type", "unknown"),
+                "file": data.get("file") or data.get("path", ""),
+                "relationship": edge.get("type", "calls")
+            })
+        return callees
+
     def export(self) -> Dict[str, Any]:
-        """Export nodes and links format for frontend visual graph rendering."""
+        """Export nodes and links for visual graph rendering."""
         nodes = []
         for node_id, data in self.graph.nodes(data=True):
             nodes.append({
