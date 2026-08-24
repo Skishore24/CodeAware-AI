@@ -20,13 +20,14 @@ import {
   Code2,
   ShieldAlert,
   Wrench,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, register, isAuthenticated } = useAuth();
+  const { login, register, isAuthenticated, isInitializing } = useAuth();
   const { addToast } = useToast();
 
   const [isRegister, setIsRegister] = useState(false);
@@ -36,39 +37,67 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [role, setRole] = useState("Lead Engineer");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isInitializing && isAuthenticated) {
       navigate("/", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isInitializing, navigate]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       addToast("Please fill in your email and password.", "warning");
       return;
     }
 
-    if (isRegister) {
-      if (!name.trim()) {
-        addToast("Please enter your full name.", "warning");
-        return;
-      }
-      register(name, email, password, role);
-      addToast(`Account created for ${name}! Welcome to CodeAware AI.`, "success");
-    } else {
-      login(email, password);
-      addToast(`Welcome back, ${email.split("@")[0]}!`, "success");
+    if (isRegister && !name.trim()) {
+      addToast("Please enter your full name.", "warning");
+      return;
     }
 
-    navigate("/", { replace: true });
+    setLoading(true);
+    try {
+      if (isRegister) {
+        const res = await register(name.trim(), email.trim(), password, role);
+        if (res.success) {
+          addToast(`Account created for ${name}! Welcome to CodeAware AI.`, "success");
+          navigate("/", { replace: true });
+        } else {
+          addToast(res.error || "Registration failed.", "error");
+        }
+      } else {
+        const res = await login(email.trim(), password);
+        if (res.success) {
+          addToast(`Welcome back, ${res.user?.name || email.split("@")[0]}!`, "success");
+          navigate("/", { replace: true });
+        } else {
+          addToast(res.error || "Invalid email or password. Please try again.", "error");
+        }
+      }
+    } catch (err) {
+      addToast(err.message || "Authentication error occurred.", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDemoLogin = () => {
-    login("alex.morgan@codeaware.ai", "demo12345");
-    addToast("Signed in as Demo Lead Engineer.", "success");
-    navigate("/", { replace: true });
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      const res = await login("alex.morgan@codeaware.ai", "demo12345");
+      if (res.success) {
+        addToast("Signed in as Demo Lead Engineer.", "success");
+        navigate("/", { replace: true });
+      } else {
+        addToast(res.error || "Demo login failed.", "error");
+      }
+    } catch (err) {
+      addToast(err.message || "Demo login failed.", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -168,7 +197,7 @@ export default function Login() {
 
           {/* Quick Demo Access Bar */}
           <div
-            onClick={handleDemoLogin}
+            onClick={loading ? undefined : handleDemoLogin}
             className="card card-interactive"
             style={{
               padding: "12px 16px",
@@ -178,6 +207,8 @@ export default function Login() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              opacity: loading ? 0.7 : 1,
+              pointerEvents: loading ? "none" : "auto",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -193,7 +224,7 @@ export default function Login() {
                 </div>
               </div>
             </div>
-            <ArrowRight size={16} color="var(--primary)" />
+            {loading ? <Loader2 size={16} className="spin" color="var(--primary)" /> : <ArrowRight size={16} color="var(--primary)" />}
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -211,6 +242,7 @@ export default function Login() {
                     onChange={(e) => setName(e.target.value)}
                     style={{ paddingLeft: "36px", height: "42px" }}
                     required
+                    disabled={loading}
                   />
                   <User size={15} color="var(--text-subtle)" style={{ position: "absolute", left: "12px", top: "13px" }} />
                 </div>
@@ -230,6 +262,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   style={{ paddingLeft: "36px", height: "42px" }}
                   required
+                  disabled={loading}
                 />
                 <Mail size={15} color="var(--text-subtle)" style={{ position: "absolute", left: "12px", top: "13px" }} />
               </div>
@@ -262,6 +295,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ paddingLeft: "36px", paddingRight: "38px", height: "42px" }}
                   required
+                  disabled={loading}
                 />
                 <Lock size={15} color="var(--text-subtle)" style={{ position: "absolute", left: "12px", top: "13px" }} />
                 <button
@@ -287,7 +321,7 @@ export default function Login() {
                 <label style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
                   Engineering Role
                 </label>
-                <select className="select" value={role} onChange={(e) => setRole(e.target.value)} style={{ height: "42px" }}>
+                <select className="select" value={role} onChange={(e) => setRole(e.target.value)} style={{ height: "42px" }} disabled={loading}>
                   <option value="Lead Engineer">Lead Engineer / Architect</option>
                   <option value="Senior Developer">Senior Full Stack Developer</option>
                   <option value="Security Analyst">Security Analyst</option>
@@ -303,6 +337,7 @@ export default function Login() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   style={{ accentColor: "var(--primary)" }}
+                  disabled={loading}
                 />
                 <span>Remember this workstation</span>
               </label>
@@ -312,9 +347,18 @@ export default function Login() {
               </span>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-lg" style={{ width: "100%", height: "44px", marginTop: "4px" }}>
-              <span>{isRegister ? "Create Account & Enter" : "Sign In to Workspace"}</span>
-              <ArrowRight size={16} />
+            <button type="submit" className="btn btn-primary btn-lg" style={{ width: "100%", height: "44px", marginTop: "4px" }} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="spin" />
+                  <span>Verifying Credentials...</span>
+                </>
+              ) : (
+                <>
+                  <span>{isRegister ? "Create Account & Enter" : "Sign In to Workspace"}</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
 

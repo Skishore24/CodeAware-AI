@@ -8,6 +8,9 @@ export const cloneRepository = (url) =>
 export const cloneAndIngest = (url) =>
   client.post("/repositories/clone-and-ingest", { url });
 
+export const deleteRepository = (repositoryName) =>
+  client.delete(`/repositories/${encodeURIComponent(repositoryName)}`);
+
 export const scanRepository = (repositoryPath) =>
   client.post("/repositories/scan", { repository_path: repositoryPath });
 
@@ -25,3 +28,4 @@ export const getFileContent = (repositoryName, filePath, startLine = null, endLi
     start_line: startLine,
     end_line: endLine,
   });
+

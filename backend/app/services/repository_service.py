@@ -1,8 +1,22 @@
+import os
+import shutil
+import stat
 from pathlib import Path
 from urllib.parse import urlparse
 import re
 from git import Repo
 from git.exc import GitCommandError
+
+
+def _remove_readonly(func, path, exc_info):
+    """
+    Error handler for shutil.rmtree on Windows when removing read-only git files.
+    """
+    try:
+        os.chmod(path, stat.S_IWRITE | stat.S_IWUSR)
+        func(path)
+    except Exception:
+        pass
 
 
 class RepositoryService:
@@ -62,6 +76,31 @@ class RepositoryService:
             "message": "Repository cloned successfully.",
             "repository_name": repository_name,
             "path": str(destination),
+        }
+
+    def delete_repository(self, repository_name: str) -> dict:
+        """
+        Safely delete a cloned repository from the local workspace.
+        """
+        sanitized_name = re.sub(r"[^A-Za-z0-9_\-\.]", "_", repository_name.strip())
+        target_dir = (self.workspace_dir / sanitized_name).resolve()
+
+        # Path traversal guard
+        if not str(target_dir).startswith(str(self.workspace_dir)):
+            raise ValueError("Target repository directory escapes the workspace.")
+
+        if not target_dir.exists():
+            raise FileNotFoundError(f"Repository '{sanitized_name}' does not exist in workspace.")
+
+        try:
+            shutil.rmtree(target_dir, onerror=_remove_readonly)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to delete repository directory: {exc}") from exc
+
+        return {
+            "success": True,
+            "message": f"Repository '{sanitized_name}' deleted successfully.",
+            "repository_name": sanitized_name,
         }
 
     def list_repositories(self) -> list:

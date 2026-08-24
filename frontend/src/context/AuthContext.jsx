@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 import {
   loginUser,
   registerUser,
+  getMe,
   getTeam,
   addTeamMemberApi,
   removeTeamMemberApi,
@@ -10,6 +11,14 @@ import {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem("codeaware_token") || null;
+    } catch {
+      return null;
+    }
+  });
+
   const [user, setUser] = useState(() => {
     try {
       const stored = localStorage.getItem("codeaware_user");
@@ -19,20 +28,67 @@ export function AuthProvider({ children }) {
     }
   });
 
+  const [isInitializing, setIsInitializing] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
 
+  // Validate existing JWT token on app boot
   useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem("codeaware_user", JSON.stringify(user));
-      } else {
-        localStorage.removeItem("codeaware_user");
-      }
-    } catch {}
-  }, [user]);
+    let isMounted = true;
 
+    async function verifySession() {
+      const storedToken = localStorage.getItem("codeaware_token");
+      if (!storedToken) {
+        if (isMounted) {
+          setUser(null);
+          setToken(null);
+          setIsInitializing(false);
+        }
+        return;
+      }
+
+      try {
+        const data = await getMe();
+        if (isMounted && data?.user) {
+          setUser(data.user);
+          setToken(storedToken);
+          localStorage.setItem("codeaware_user", JSON.stringify(data.user));
+        } else if (isMounted) {
+          throw new Error("Invalid session");
+        }
+      } catch (err) {
+        console.warn("Session expired or invalid token:", err.message);
+        if (isMounted) {
+          localStorage.removeItem("codeaware_token");
+          localStorage.removeItem("codeaware_user");
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+      }
+    }
+
+    verifySession();
+
+    // Listen to unauthorized event dispatched from Axios interceptor
+    const handleUnauthorized = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener("codeaware_auth_unauthorized", handleUnauthorized);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("codeaware_auth_unauthorized", handleUnauthorized);
+    };
+  }, []);
+
+  // Fetch team members when authenticated
   const loadTeam = useCallback(async () => {
+    if (!token) return;
     setLoadingTeam(true);
     try {
       const data = await getTeam();
@@ -40,72 +96,75 @@ export function AuthProvider({ children }) {
         setTeamMembers(data.team);
       }
     } catch (err) {
-      console.warn("Could not fetch team from database:", err);
+      console.warn("Could not fetch team members:", err.message);
     } finally {
       setLoadingTeam(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
-    if (user) {
+    if (user && token) {
       loadTeam();
     }
-  }, [user, loadTeam]);
+  }, [user, token, loadTeam]);
 
+  // Secure Login with JWT
   const login = async (email, password) => {
     try {
       const res = await loginUser(email, password);
-      if (res?.user) {
+      if (res?.access_token && res?.user) {
+        localStorage.setItem("codeaware_token", res.access_token);
+        localStorage.setItem("codeaware_user", JSON.stringify(res.user));
+        setToken(res.access_token);
         setUser(res.user);
-        return { success: true, user: res.user };
+        return { success: true, user: res.user, token: res.access_token };
       }
-      throw new Error(res?.detail || "Authentication failed.");
+      throw new Error(res?.detail || res?.message || "Invalid authentication credentials.");
     } catch (err) {
-      // Fallback for seamless developer testing if server offline
-      const fallbackUser = {
-        id: "usr_01",
-        name: email.split("@")[0].replace(".", " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        email: email.trim(),
-        role: "Lead Engineer",
-        organization: "Engineering Core",
-        twoFactorEnabled: true,
-        createdAt: new Date().toISOString().split("T")[0],
-      };
-      setUser(fallbackUser);
-      return { success: true, user: fallbackUser };
+      const errorMsg = err.message || "Invalid email or password. Please check your credentials.";
+      return { success: false, error: errorMsg };
     }
   };
 
+  // Secure Registration with JWT
   const register = async (name, email, password, role = "Developer") => {
     try {
       const res = await registerUser(name, email, password, role);
-      if (res?.user) {
+      if (res?.access_token && res?.user) {
+        localStorage.setItem("codeaware_token", res.access_token);
+        localStorage.setItem("codeaware_user", JSON.stringify(res.user));
+        setToken(res.access_token);
         setUser(res.user);
         await loadTeam();
-        return { success: true, user: res.user };
+        return { success: true, user: res.user, token: res.access_token };
       }
-      throw new Error(res?.detail || "Registration failed.");
+      throw new Error(res?.detail || res?.message || "Registration failed.");
     } catch (err) {
-      const fallbackUser = {
-        id: "usr_" + Math.random().toString(36).substr(2, 6),
-        name: name.trim(),
-        email: email.trim(),
-        role,
-        organization: "Engineering Core",
-        twoFactorEnabled: false,
-        createdAt: new Date().toISOString().split("T")[0],
-      };
-      setUser(fallbackUser);
-      return { success: true, user: fallbackUser };
+      const errorMsg = err.message || "Registration failed. Email may already be in use.";
+      return { success: false, error: errorMsg };
     }
   };
 
+  // Logout & Revoke local token
   const logout = () => {
+    try {
+      localStorage.removeItem("codeaware_token");
+      localStorage.removeItem("codeaware_user");
+    } catch {}
+    setToken(null);
     setUser(null);
+    setTeamMembers([]);
   };
 
   const updateProfile = (updates) => {
-    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      try {
+        localStorage.setItem("codeaware_user", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   };
 
   const addTeamMember = async (name, email, role) => {
@@ -116,16 +175,7 @@ export function AuthProvider({ children }) {
         return res.member;
       }
     } catch (err) {
-      const fallbackMember = {
-        id: "usr_" + Math.random().toString(36).substr(2, 6),
-        name,
-        email,
-        role,
-        status: "Invited",
-        last_active: "Pending",
-      };
-      setTeamMembers((prev) => [...prev, fallbackMember]);
-      return fallbackMember;
+      throw err;
     }
   };
 
@@ -141,8 +191,10 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider
       value={{
+        token,
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: Boolean(token && user),
+        isInitializing,
         teamMembers,
         loadingTeam,
         login,
@@ -160,3 +212,4 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+

@@ -16,9 +16,11 @@ import {
   ShieldCheck,
   GitGraph,
   Trash2,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
-import { cloneAndIngest } from "../api/repositories";
+import { cloneAndIngest, deleteRepository } from "../api/repositories";
 import { useToast } from "../components/Toast";
 import { useNavigate } from "react-router-dom";
 import EmptyState from "../components/feedback/EmptyState";
@@ -33,6 +35,9 @@ export default function Repositories() {
   const [cloning, setCloning] = useState(false);
   const [cloneStage, setCloneStage] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
+  const [repoToDelete, setRepoToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
 
   const sampleRepositories = [
     {
@@ -86,6 +91,25 @@ export default function Repositories() {
     } finally {
       setCloning(false);
       setCloneStage("");
+    }
+  };
+
+  const handleDeleteRepo = async (repoName) => {
+    if (!repoName) return;
+    setDeleting(true);
+    try {
+      const res = await deleteRepository(repoName);
+      if (res?.success) {
+        addToast(`Repository "${repoName}" removed successfully.`, "success");
+        setRepoToDelete(null);
+        await refreshRepositories();
+      } else {
+        addToast(res?.error || "Failed to remove repository.", "error");
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to remove repository.", "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -303,15 +327,28 @@ export default function Repositories() {
                         </div>
                       </div>
 
-                      {isActive ? (
-                        <span className="badge badge-success" style={{ fontSize: "11px" }}>
-                          <CheckCircle2 size={12} /> Active
-                        </span>
-                      ) : (
-                        <span className="badge badge-neutral" style={{ fontSize: "11px" }}>
-                          Ready
-                        </span>
-                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        {isActive ? (
+                          <span className="badge badge-success" style={{ fontSize: "11px" }}>
+                            <CheckCircle2 size={12} /> Active
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: "11px" }}>
+                            Ready
+                          </span>
+                        )}
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRepoToDelete(repo);
+                          }}
+                          title={`Remove ${repo.name}`}
+                          style={{ color: "var(--text-subtle)", padding: "4px 6px" }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", wordBreak: "break-all", marginBottom: "14px" }}>
@@ -347,7 +384,7 @@ export default function Repositories() {
                       </button>
                     </div>
 
-                    <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                       <button
                         className="btn btn-ghost btn-sm"
                         style={{ flex: 1, fontSize: "11.5px" }}
@@ -370,6 +407,15 @@ export default function Repositories() {
                         <GitGraph size={12} />
                         <span>Graph</span>
                       </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ color: "#EF4444", fontSize: "11.5px", padding: "4px 8px" }}
+                        onClick={() => setRepoToDelete(repo)}
+                        title="Remove cloned repository"
+                      >
+                        <Trash2 size={12} />
+                        <span>Remove</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -378,6 +424,109 @@ export default function Repositories() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {repoToDelete && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            animation: "fadeIn 0.15s ease-out",
+          }}
+          onClick={() => !deleting && setRepoToDelete(null)}
+        >
+          <div
+            className="card"
+            style={{
+              width: "440px",
+              maxWidth: "92%",
+              padding: "24px",
+              boxShadow: "var(--shadow-xl)",
+              animation: "scaleIn 0.2s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "16px" }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "var(--radius-md)",
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  color: "#EF4444",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AlertTriangle size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-main)", marginBottom: "4px" }}>
+                  Remove Cloned Repository?
+                </h3>
+                <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                  Are you sure you want to remove <strong style={{ color: "var(--text-main)" }}>{repoToDelete.name}</strong> from your local workspace? This will safely delete the local cloned files and indices.
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "10px 12px",
+                backgroundColor: "var(--bg-subtle)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-color)",
+                fontSize: "12px",
+                fontFamily: "JetBrains Mono",
+                color: "var(--text-muted)",
+                wordBreak: "break-all",
+                marginBottom: "20px",
+              }}
+            >
+              {repoToDelete.path}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setRepoToDelete(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-sm"
+                style={{ backgroundColor: "#EF4444", color: "white", borderColor: "#EF4444" }}
+                onClick={() => handleDeleteRepo(repoToDelete.name)}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Delete Repository</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

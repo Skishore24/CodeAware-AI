@@ -7,3 +7,7 @@ networkx
 scikit-learn
 numpy
 httpx
+pyjwt
+bcrypt
+sqlalchemy
+pymysql

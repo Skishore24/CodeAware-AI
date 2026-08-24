@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Layers, ShieldCheck, Loader2 } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/layout/Header";
 import CommandPalette from "./components/CommandPalette";
@@ -31,7 +32,7 @@ function PageWrapper({ children }) {
 
 function MainLayout() {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -45,8 +46,50 @@ function MainLayout() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  if (!isAuthenticated && location.pathname !== "/login") {
-    return <Navigate to="/login" replace />;
+  if (isInitializing) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "var(--bg-app)",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, var(--primary), var(--secondary))",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+            boxShadow: "0 0 24px rgba(99, 102, 241, 0.4)",
+            animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+          }}
+        >
+          <Layers size={26} />
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: "16px", color: "var(--text-main)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            <Loader2 size={16} className="spin" />
+            <span>Verifying Secure Session</span>
+          </div>
+          <div style={{ fontSize: "12.5px", color: "var(--text-muted)", marginTop: "4px" }}>
+            Validating cryptographic JWT token with CodeAware backend...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return (
@@ -94,3 +137,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+

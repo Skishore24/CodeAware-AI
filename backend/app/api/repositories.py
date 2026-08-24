@@ -124,6 +124,60 @@ def clone_repository(
 
 
 # ---------------------------------------------------------
+# Delete Cloned Repository
+# ---------------------------------------------------------
+
+class DeleteRepositoryRequest(BaseModel):
+    repository_name: str
+
+
+@router.delete("/{repository_name}")
+def delete_repository_by_name(repository_name: str):
+    """
+    Remove a cloned repository and its indexed records from the workspace.
+    """
+    try:
+        result = repository_service.delete_repository(repository_name)
+
+        # Also remove from database if present
+        if SessionLocal:
+            try:
+                with SessionLocal() as db:
+                    existing = db.query(DBRepository).filter(DBRepository.name == repository_name).first()
+                    if existing:
+                        db.delete(existing)
+                        db.commit()
+            except Exception:
+                pass
+
+        return result
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        )
+
+
+@router.post("/delete")
+def delete_repository_post(request: DeleteRepositoryRequest):
+    """
+    Alternative POST endpoint to delete a repository.
+    """
+    return delete_repository_by_name(request.repository_name)
+
+
+
+# ---------------------------------------------------------
 # Clone and Ingest Repository
 # ---------------------------------------------------------
 

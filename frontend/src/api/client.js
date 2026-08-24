@@ -10,10 +10,35 @@ const client = axios.create({
   timeout: 60000,
 });
 
-// Response interceptor for consistent error extraction
+// Request interceptor to attach JWT Bearer token
+client.interceptors.request.use(
+  (config) => {
+    try {
+      const token = localStorage.getItem("codeaware_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // Ignore localStorage access issues
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for consistent error extraction and token expiry handling
 client.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    if (error.response?.status === 401) {
+      try {
+        localStorage.removeItem("codeaware_token");
+        localStorage.removeItem("codeaware_user");
+        // Dispatch custom event if app needs to respond to auth logout
+        window.dispatchEvent(new Event("codeaware_auth_unauthorized"));
+      } catch {}
+    }
+
     let message = "An unexpected server error occurred.";
     if (error.response?.data) {
       if (typeof error.response.data.detail === "string") {
@@ -31,3 +56,4 @@ client.interceptors.response.use(
 );
 
 export default client;
+
