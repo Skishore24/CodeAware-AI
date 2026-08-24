@@ -3,6 +3,9 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 
 from app.services.autonomous_workflow import AutonomousWorkflow
+from app.db.database import SessionLocal
+from app.db.models import AutonomousFixRecord
+import datetime
 
 
 router = APIRouter(
@@ -48,7 +51,29 @@ class PRRequest(BaseModel):
 @router.post("/run")
 def run_autonomous_workflow(request: AutonomousRequest):
     try:
-        return workflow.run(request.model_dump())
+        res = workflow.run(request.model_dump())
+        
+        # Persist generated patch to MySQL database
+        if SessionLocal and res:
+            try:
+                repo_name = request.repository_name or (request.repository_path.split("/")[-1] if request.repository_path else "default")
+                with SessionLocal() as db:
+                    raw = res.get("raw_data", {})
+                    fix_rec = AutonomousFixRecord(
+                        repository_name=repo_name,
+                        file_path=request.file_path,
+                        problem_description=request.problem,
+                        original_code=raw.get("original_code", ""),
+                        patched_code=raw.get("patched_code", ""),
+                        validation_status="Verified" if res.get("success") else "Failed",
+                        is_applied=False,
+                    )
+                    db.add(fix_rec)
+                    db.commit()
+            except Exception:
+                pass
+
+        return res
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -59,7 +84,27 @@ def approve_fix(request: ApprovalRequest):
         data = request.model_dump()
         if not data.get("patched_code") and data.get("modified_code"):
             data["patched_code"] = data["modified_code"]
-        return workflow.approve_and_apply(data)
+        res = workflow.approve_and_apply(data)
+
+        # Mark applied in MySQL database
+        if SessionLocal and res.get("success"):
+            try:
+                with SessionLocal() as db:
+                    repo_name = request.repository_name or "default"
+                    latest_fix = (
+                        db.query(AutonomousFixRecord)
+                        .filter(AutonomousFixRecord.file_path == request.file_path)
+                        .order_by(AutonomousFixRecord.id.desc())
+                        .first()
+                    )
+                    if latest_fix:
+                        latest_fix.is_applied = True
+                        latest_fix.applied_at = datetime.datetime.utcnow()
+                        db.commit()
+            except Exception:
+                pass
+
+        return res
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

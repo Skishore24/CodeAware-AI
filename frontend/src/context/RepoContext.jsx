@@ -55,14 +55,23 @@ export function RepoProvider({ children }) {
       setRepositories(list);
 
       setActiveRepoState((current) => {
-        if (!current && list.length > 0) {
-          const first = list[0];
+        if (list.length === 0) {
           try {
-            localStorage.setItem("codeaware_active_repo", JSON.stringify(first));
+            localStorage.removeItem("codeaware_active_repo");
           } catch {}
-          return first;
+          return null;
         }
-        return current;
+
+        // If current repo is in list, keep it; otherwise auto-select first available repository
+        const matchingRepo = current
+          ? list.find((r) => r.name === current.name || r.path === current.path)
+          : null;
+
+        const nextRepo = matchingRepo || list[0];
+        try {
+          localStorage.setItem("codeaware_active_repo", JSON.stringify(nextRepo));
+        } catch {}
+        return nextRepo;
       });
     } catch (err) {
       console.warn("Could not load cloned repositories:", err);

@@ -5,9 +5,6 @@ import {
   Search,
   CheckCircle2,
   RefreshCw,
-  Clock,
-  ArrowUpRight,
-  ShieldCheck,
   Plus,
   Loader2,
   ExternalLink,
@@ -15,35 +12,40 @@ import {
   FileCode2,
   Sparkles,
   Layers,
+  ArrowRight,
+  ShieldCheck,
+  GitGraph,
+  Trash2,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { cloneAndIngest } from "../api/repositories";
 import { useToast } from "../components/Toast";
 import { useNavigate } from "react-router-dom";
+import EmptyState from "../components/feedback/EmptyState";
+import { CardSkeleton } from "../components/feedback/Skeleton";
 
 export default function Repositories() {
   const navigate = useNavigate();
   const { repositories, activeRepo, setActiveRepo, refreshRepositories, loadingRepos } = useRepo();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState("git"); // 'git' | 'samples'
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloning, setCloning] = useState(false);
   const [cloneStage, setCloneStage] = useState("");
-  const [filterQuery, setFilterQuery] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
 
   const sampleRepositories = [
     {
       name: "FastAPI Clean Architecture",
       url: "https://github.com/tiangolo/fastapi.git",
-      desc: "Modern, high-performance web framework for building APIs with Python.",
+      desc: "High-performance modern Python API framework with type hints.",
       lang: "Python",
       tag: "API & Backend",
     },
     {
       name: "Flask Minimal REST",
       url: "https://github.com/pallets/flask.git",
-      desc: "Micro web framework written in Python with modular routing.",
+      desc: "Micro web framework in Python with modular routing and templates.",
       lang: "Python",
       tag: "Web Framework",
     },
@@ -58,16 +60,19 @@ export default function Repositories() {
 
   const handleClone = async (targetUrl) => {
     const url = (targetUrl || cloneUrl).trim();
-    if (!url) return;
+    if (!url) {
+      addToast("Please enter a valid Git repository URL.", "warning");
+      return;
+    }
 
     setCloning(true);
-    setCloneStage("Cloning git repository to local workspace...");
+    setCloneStage("Cloning repository into local workspace...");
 
     try {
-      setCloneStage("Scanning files & building AST symbol index...");
+      setCloneStage("Scanning AST symbols and building search index...");
       const res = await cloneAndIngest(url);
       if (res?.success) {
-        addToast("Repository cloned and ingested successfully!", "success");
+        addToast(`Repository "${res.repository_name || 'project'}" cloned and indexed successfully!`, "success");
         setCloneUrl("");
         await refreshRepositories();
         if (res.repository) {
@@ -84,234 +89,295 @@ export default function Repositories() {
     }
   };
 
-  const filteredRepos = repositories.filter((r) =>
-    r.name.toLowerCase().includes(filterQuery.toLowerCase())
+  const filteredRepos = (repositories || []).filter((r) =>
+    r.name.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
   return (
     <div className="page-container">
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h1 className="page-title">Repositories & Ingestion</h1>
-          <p className="page-subtitle">
-            Clone, ingest, and index local or remote codebases for AST symbol navigation and agent intelligence.
+          <h1 className="page-title" style={{ fontSize: "22px", fontWeight: 800 }}>
+            Repository Management & Ingestion
+          </h1>
+          <p className="page-subtitle" style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
+            Connect GitHub repositories or local codebases to build AST symbol maps, hybrid vector search, and dependency graphs.
           </p>
         </div>
-        <div className="page-actions">
-          <button className="btn btn-secondary" onClick={refreshRepositories} disabled={loadingRepos}>
-            <RefreshCw size={14} className={loadingRepos ? "animate-spin" : ""} />
-            <span>Refresh Workspace</span>
-          </button>
-        </div>
+
+        <button
+          className="btn btn-secondary"
+          onClick={refreshRepositories}
+          disabled={loadingRepos}
+          title="Refresh repository list"
+        >
+          <RefreshCw size={14} className={loadingRepos ? "animate-spin" : ""} />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      {/* Clone & Ingest Wizard Card */}
-      <div className="card" style={{ marginBottom: "var(--space-6)" }}>
-        <div className="tab-nav" style={{ marginBottom: "var(--space-4)" }}>
-          <button
-            className={`tab-btn ${activeTab === "git" ? "active" : ""}`}
-            onClick={() => setActiveTab("git")}
-          >
-            <FolderGit2 size={15} />
-            <span>Clone Git Repository</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "samples" ? "active" : ""}`}
-            onClick={() => setActiveTab("samples")}
-          >
-            <Sparkles size={15} />
-            <span>Sample Repositories</span>
-          </button>
+      {/* Connect New Repository Card */}
+      <div className="card" style={{ padding: "var(--space-6)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "var(--space-4)" }}>
+          <div className="metric-icon-box" style={{ backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+            <Plus size={18} />
+          </div>
+          <div>
+            <h2 style={{ fontSize: "16px", fontWeight: 700 }}>Connect a Repository</h2>
+            <p style={{ fontSize: "12.5px", color: "var(--text-muted)" }}>
+              Paste any GitHub repository HTTPS or SSH clone URL. CodeAware will clone, parse AST symbols, and index it.
+            </p>
+          </div>
         </div>
 
-        {activeTab === "git" ? (
-          <div>
-            <form onSubmit={(e) => { e.preventDefault(); handleClone(); }} style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-              <input
-                type="text"
-                className="input"
-                placeholder="https://github.com/owner/repository.git"
-                value={cloneUrl}
-                onChange={(e) => setCloneUrl(e.target.value)}
-                disabled={cloning}
-                style={{ flex: 1, padding: "10px 14px" }}
-              />
-              <button type="submit" className="btn btn-primary btn-lg" disabled={cloning || !cloneUrl.trim()}>
-                {cloning ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>{cloneStage || "Ingesting..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} />
-                    <span>Clone & Ingest</span>
-                  </>
-                )}
-              </button>
-            </form>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleClone();
+          }}
+          style={{ display: "flex", gap: "10px", alignItems: "center" }}
+        >
+          <div style={{ position: "relative", flex: 1 }}>
+            <input
+              type="text"
+              className="input"
+              placeholder="https://github.com/username/repository.git"
+              value={cloneUrl}
+              onChange={(e) => setCloneUrl(e.target.value)}
+              disabled={cloning}
+              style={{ paddingLeft: "36px" }}
+            />
+            <FolderGit2
+              size={16}
+              color="var(--text-subtle)"
+              style={{ position: "absolute", left: "12px", top: "11px" }}
+            />
+          </div>
 
-            <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
-              Clones repository locally into the workspace, performs AST parsing, creates TF-IDF chunks, and maps knowledge graphs.
-            </div>
-          </div>
-        ) : (
-          <div className="grid-3">
-            {sampleRepositories.map((sample, idx) => (
-              <div key={idx} className="card" style={{ backgroundColor: "var(--bg-subtle)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-main)" }}>{sample.name}</span>
-                  <span className="badge badge-primary" style={{ fontSize: "11px" }}>{sample.lang}</span>
-                </div>
-                <p style={{ fontSize: "12.5px", color: "var(--text-muted)", marginBottom: "14px", lineHeight: "1.4" }}>
-                  {sample.desc}
-                </p>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  style={{ width: "100%" }}
-                  disabled={cloning}
-                  onClick={() => handleClone(sample.url)}
-                >
-                  <FolderGit2 size={13} />
-                  <span>Ingest this repo</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
+            disabled={cloning || !cloneUrl.trim()}
+          >
+            {cloning ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Ingesting...</span>
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                <span>Clone & Ingest</span>
+              </>
+            )}
+          </button>
+        </form>
 
         {cloning && (
-          <div className="timeline" style={{ marginTop: "var(--space-4)", backgroundColor: "var(--bg-subtle)" }}>
-            <div className="timeline-step">
-              <span className="timeline-dot completed"></span>
-              <span style={{ fontWeight: 600 }}>Step 1:</span>
-              <span>Validating Git Target</span>
-            </div>
-            <div className="timeline-step">
-              <span className="timeline-dot running"></span>
-              <span style={{ fontWeight: 600 }}>Step 2:</span>
-              <span>{cloneStage || "Executing clone and AST symbol parsing..."}</span>
-            </div>
-            <div className="timeline-step">
-              <span className="timeline-dot"></span>
-              <span style={{ fontWeight: 600 }}>Step 3:</span>
-              <span>Vectorizing Chunks & Building Knowledge Graph</span>
-            </div>
+          <div style={{ marginTop: "14px", padding: "10px 14px", backgroundColor: "var(--primary-light)", borderRadius: "var(--radius-md)", border: "1px solid var(--primary-border)", display: "flex", alignItems: "center", gap: "10px" }}>
+            <Loader2 size={16} className="animate-spin" color="var(--primary)" />
+            <span style={{ fontSize: "12.5px", color: "var(--primary-text)", fontWeight: 600 }}>
+              {cloneStage}
+            </span>
           </div>
         )}
-      </div>
 
-      {/* Filter & Active Count Bar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-        <div style={{ position: "relative", width: "320px" }}>
-          <input
-            type="text"
-            className="input"
-            placeholder="Filter indexed repositories..."
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            style={{ paddingLeft: "34px" }}
-          />
-          <Search size={16} color="var(--text-subtle)" style={{ position: "absolute", left: "10px", top: "10px" }} />
-        </div>
-        <span style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 500 }}>
-          {filteredRepos.length} workspace repositor{filteredRepos.length === 1 ? "y" : "ies"}
-        </span>
-      </div>
-
-      {/* Repositories Grid */}
-      {filteredRepos.length === 0 ? (
-        <div className="card" style={{ padding: "50px 20px", textAlign: "center" }}>
-          <FolderGit2 size={44} color="var(--text-subtle)" style={{ margin: "0 auto 12px" }} />
-          <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-main)" }}>No repositories indexed yet</h3>
-          <p style={{ fontSize: "13.5px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Clone a public GitHub repository or ingest a sample repository above to start analyzing code.
-          </p>
-        </div>
-      ) : (
-        <div className="grid-3">
-          {filteredRepos.map((repo) => {
-            const isActive = activeRepo?.name === repo.name;
-            return (
+        {/* Quick Sample Presets */}
+        <div style={{ marginTop: "18px" }}>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px" }}>
+            Or try one of these sample open-source repositories:
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px" }}>
+            {sampleRepositories.map((sample, idx) => (
               <div
-                key={repo.name}
-                className="card"
-                style={{
-                  borderColor: isActive ? "var(--primary)" : "var(--border-color)",
-                  boxShadow: isActive ? "0 0 0 2px var(--primary-light), var(--shadow-sm)" : "var(--shadow-xs)",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
+                key={idx}
+                className="card card-interactive"
+                style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                onClick={() => {
+                  setCloneUrl(sample.url);
+                  handleClone(sample.url);
                 }}
               >
                 <div>
-                  <div className="card-header" style={{ marginBottom: "var(--space-2)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div
-                        style={{
-                          width: "30px",
-                          height: "30px",
-                          borderRadius: "var(--radius-sm)",
-                          backgroundColor: isActive ? "var(--primary-light)" : "var(--bg-muted)",
-                          color: isActive ? "var(--primary)" : "var(--text-secondary)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
+                  <div style={{ fontWeight: 700, fontSize: "13px" }}>{sample.name}</div>
+                  <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+                    {sample.desc}
+                  </div>
+                  <span className="badge badge-neutral" style={{ marginTop: "6px", fontSize: "10.5px" }}>
+                    {sample.lang} • {sample.tag}
+                  </span>
+                </div>
+                <ArrowRight size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Cloned Repositories Section */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+          <div>
+            <h2 style={{ fontSize: "18px", fontWeight: 800 }}>Cloned Repositories</h2>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "2px" }}>
+              {repositories.length} {repositories.length === 1 ? "repository" : "repositories"} available in your local workspace.
+            </p>
+          </div>
+
+          {repositories.length > 0 && (
+            <div style={{ position: "relative", width: "240px" }}>
+              <input
+                type="text"
+                className="input"
+                placeholder="Filter repositories..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                style={{ paddingLeft: "32px", fontSize: "12.5px" }}
+              />
+              <Search size={14} color="var(--text-subtle)" style={{ position: "absolute", left: "10px", top: "10px" }} />
+            </div>
+          )}
+        </div>
+
+        {loadingRepos ? (
+          <div className="grid-3">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        ) : filteredRepos.length === 0 ? (
+          repositories.length === 0 ? (
+            <EmptyState
+              icon={FolderGit2}
+              title="No Repositories Cloned Yet"
+              description="Clone a GitHub repository using the input box above or choose a sample repository to start exploring AST symbols, code search, and security reviews."
+              actionText="Clone Sample Repo (FastAPI)"
+              onAction={() => handleClone("https://github.com/tiangolo/fastapi.git")}
+            />
+          ) : (
+            <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--text-muted)" }}>
+              No repositories match "{searchFilter}"
+            </div>
+          )
+        ) : (
+          <div className="grid-3">
+            {filteredRepos.map((repo) => {
+              const isActive = activeRepo?.name === repo.name || activeRepo?.path === repo.path;
+              return (
+                <div
+                  key={repo.name}
+                  className="card"
+                  style={{
+                    padding: "var(--space-5)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    borderColor: isActive ? "var(--primary)" : "var(--border-color)",
+                    backgroundColor: isActive ? "var(--bg-surface)" : "var(--bg-card)",
+                    boxShadow: isActive ? "0 0 0 1px var(--primary), var(--shadow-md)" : "var(--shadow-sm)",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            borderRadius: "var(--radius-md)",
+                            backgroundColor: isActive ? "var(--primary-light)" : "var(--bg-muted)",
+                            color: isActive ? "var(--primary)" : "var(--text-secondary)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <FolderGit2 size={16} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: "14.5px", fontWeight: 700 }}>{repo.name}</h3>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "1px" }}>
+                            {repo.files_count ? `${repo.files_count} source files` : "Indexed"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isActive ? (
+                        <span className="badge badge-success" style={{ fontSize: "11px" }}>
+                          <CheckCircle2 size={12} /> Active
+                        </span>
+                      ) : (
+                        <span className="badge badge-neutral" style={{ fontSize: "11px" }}>
+                          Ready
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", wordBreak: "break-all", marginBottom: "14px" }}>
+                      {repo.path}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px" }}>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        className={`btn ${isActive ? "btn-primary" : "btn-secondary"} btn-sm`}
+                        style={{ flex: 1 }}
+                        onClick={() => {
+                          setActiveRepo(repo);
+                          addToast(`Switched active repository to ${repo.name}`, "info");
                         }}
                       >
-                        <FolderGit2 size={16} />
-                      </div>
-                      <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--text-main)" }}>
-                        {repo.name}
-                      </span>
-                    </div>
-                    {isActive ? (
-                      <span className="badge badge-primary">Active</span>
-                    ) : (
-                      <span className="badge badge-neutral">Indexed</span>
-                    )}
-                  </div>
+                        <CheckCircle2 size={13} />
+                        <span>{isActive ? "Active Workspace" : "Activate"}</span>
+                      </button>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12.5px", color: "var(--text-muted)", margin: "10px 0" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>Indexed Files</span>
-                      <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
-                        {repo.files_count ? `${repo.files_count} files` : "Ready"}
-                      </span>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setActiveRepo(repo);
+                          navigate("/search");
+                        }}
+                        title="Search this repository"
+                      >
+                        <Search size={13} />
+                        <span>Search</span>
+                      </button>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>Intelligence Status</span>
-                      <span style={{ color: "var(--success)", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
-                        <CheckCircle2 size={12} /> Ready
-                      </span>
+
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ flex: 1, fontSize: "11.5px" }}
+                        onClick={() => {
+                          setActiveRepo(repo);
+                          navigate("/review");
+                        }}
+                      >
+                        <ShieldCheck size={12} />
+                        <span>Review</span>
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ flex: 1, fontSize: "11.5px" }}
+                        onClick={() => {
+                          setActiveRepo(repo);
+                          navigate("/graph");
+                        }}
+                      >
+                        <GitGraph size={12} />
+                        <span>Graph</span>
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border-color)", display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                  {isActive ? (
-                    <button className="btn btn-secondary btn-sm" onClick={() => navigate("/search")}>
-                      <Search size={13} />
-                      <span>Search Code</span>
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => {
-                        setActiveRepo(repo);
-                        addToast(`Switched active repository to ${repo.name}`, "info");
-                      }}
-                    >
-                      <span>Set as Active</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

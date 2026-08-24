@@ -22,22 +22,46 @@ export default function CommandPalette({ isOpen, onClose }) {
 
   const actions = [
     { id: "dashboard", name: "Overview Dashboard", icon: Zap, section: "Navigation", path: "/" },
-    { id: "search", name: "Code Search", icon: Search, section: "Navigation", path: "/search" },
-    { id: "review", name: "Code Review", icon: CheckCircle, section: "Navigation", path: "/review" },
-    { id: "agent", name: "Agent Chat & Intelligence", icon: Bot, section: "Navigation", path: "/agent" },
-    { id: "graph", name: "Knowledge Graph", icon: GitGraph, section: "Navigation", path: "/graph" },
+    { id: "search", name: "Code Search (Natural Language & AST)", icon: Search, section: "Navigation", path: "/search" },
+    { id: "review", name: "Code Review (8 Dimensions)", icon: CheckCircle, section: "Navigation", path: "/review" },
+    { id: "security", name: "Security & Vulnerability Dashboard", icon: ShieldAlert, section: "Navigation", path: "/security" },
+    { id: "agent", name: "Agent Chat & Intelligence Workspace", icon: Bot, section: "Navigation", path: "/agent" },
+    { id: "graph", name: "Knowledge Graph & Topology", icon: GitGraph, section: "Navigation", path: "/graph" },
     { id: "impact", name: "Impact & Blast Radius Analysis", icon: GitGraph, section: "Navigation", path: "/impact" },
-    { id: "security", name: "Security & Vulnerability Scan", icon: ShieldAlert, section: "Navigation", path: "/security" },
     { id: "autonomous", name: "Autonomous Fix & Patching", icon: Wrench, section: "Navigation", path: "/autonomous" },
     { id: "tests", name: "Generate Unit Tests", icon: FileCode, section: "Navigation", path: "/tests" },
-    { id: "repos", name: "Manage Repositories", icon: FolderGit2, section: "Navigation", path: "/repos" },
-    { id: "settings", name: "System Settings", icon: Sliders, section: "Navigation", path: "/settings" },
+    { id: "repos", name: "Manage Repositories & Ingestion", icon: FolderGit2, section: "Navigation", path: "/repos" },
+    { id: "settings", name: "System Settings & Diagnostics", icon: Sliders, section: "Navigation", path: "/settings" },
   ];
+
+  // If query is typed, add a quick search action
+  const dynamicActions = query.trim()
+    ? [
+        {
+          id: "quick-search",
+          name: `Search code for "${query}"`,
+          icon: Search,
+          section: "Instant Search",
+          action: () => {
+            navigate(`/search?q=${encodeURIComponent(query)}`);
+          },
+        },
+        {
+          id: "quick-impact",
+          name: `Calculate impact for symbol "${query}"`,
+          icon: GitGraph,
+          section: "Instant Impact",
+          action: () => {
+            navigate(`/impact?symbol=${encodeURIComponent(query)}`);
+          },
+        },
+      ]
+    : [];
 
   // Add repositories to searchable commands
   const repoCommands = repositories.map((r) => ({
     id: `repo-${r.name}`,
-    name: `Switch Repo: ${r.name}`,
+    name: `Switch Active Repo: ${r.name}`,
     icon: FolderGit2,
     section: "Repositories",
     action: () => {
@@ -46,7 +70,7 @@ export default function CommandPalette({ isOpen, onClose }) {
     },
   }));
 
-  const allItems = [...actions, ...repoCommands];
+  const allItems = [...dynamicActions, ...actions, ...repoCommands];
   const filtered = allItems.filter((item) =>
     item.name.toLowerCase().includes(query.toLowerCase())
   );

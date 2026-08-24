@@ -17,3 +17,11 @@ export const analyzeCode = (repositoryPath) =>
 export const healthCheck = () => client.get("/health");
 
 export const getSystemStatus = () => client.get("/system/status");
+
+export const getFileContent = (repositoryName, filePath, startLine = null, endLine = null) =>
+  client.post("/repositories/file-content", {
+    repository_name: repositoryName,
+    file_path: filePath,
+    start_line: startLine,
+    end_line: endLine,
+  });

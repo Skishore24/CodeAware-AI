@@ -13,17 +13,25 @@ import {
   Award,
   Sparkles,
   ShieldCheck,
+  ArrowRight,
+  Sliders,
+  Wrench,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runCodeReview } from "../api/review";
 import { useToast } from "../components/Toast";
+import { useNavigate } from "react-router-dom";
+import EmptyState from "../components/feedback/EmptyState";
+import { CardSkeleton } from "../components/feedback/Skeleton";
 
 export default function CodeReview() {
+  const navigate = useNavigate();
   const { activeRepo } = useRepo();
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [reviewData, setReviewData] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview"); // 'overview' | 'issues' | 'architecture' | 'recommendations'
 
   const handleRunReview = async () => {
     if (!activeRepo) return;
@@ -45,6 +53,20 @@ export default function CodeReview() {
     }
   }, [activeRepo]);
 
+  if (!activeRepo) {
+    return (
+      <div className="page-container">
+        <EmptyState
+          icon={ShieldCheck}
+          title="No Repository Active for Review"
+          description="Select or connect a repository to run a comprehensive 8-dimension engineering code quality review."
+          actionText="Select Repository"
+          actionPath="/repos"
+        />
+      </div>
+    );
+  }
+
   const dimensions = reviewData?.raw_data?.dimensions || [];
   const findings = reviewData?.findings || [];
   const recommendations = reviewData?.recommendations || [];
@@ -53,129 +75,176 @@ export default function CodeReview() {
   return (
     <div className="page-container">
       {/* Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h1 className="page-title">Engineering Code Review</h1>
-          <p className="page-subtitle">
-            Multi-dimensional evaluation across Correctness, OWASP Security, Performance, and Architecture.
+          <h1 className="page-title" style={{ fontSize: "22px", fontWeight: 800 }}>
+            AI Engineering Code Review
+          </h1>
+          <p className="page-subtitle" style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
+            Evaluating repository: <strong style={{ color: "var(--text-main)" }}>{activeRepo.name}</strong> across Correctness, OWASP Security, Performance, and Modularity.
           </p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={handleRunReview} disabled={loading || !activeRepo}>
+          <button className="btn btn-primary" onClick={handleRunReview} disabled={loading}>
             {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-            <span>{loading ? "Evaluating Codebase..." : "Re-Run Review"}</span>
+            <span>{loading ? "Analyzing Codebase..." : "Re-Run Review"}</span>
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="card" style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-muted)" }}>
-          <Loader2 size={40} className="animate-spin" color="var(--primary)" style={{ margin: "0 auto 12px" }} />
-          <h3 style={{ fontSize: "16px", color: "var(--text-main)", fontWeight: 700 }}>Conducting Full Engineering Review</h3>
-          <p style={{ fontSize: "13.5px", marginTop: "4px" }}>
-            Scanning AST symbols, validating exception boundaries, evaluating OWASP rules, and checking maintainability...
-          </p>
+        <div className="grid-3">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
         </div>
       ) : reviewData ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-          {/* Overall Score Banner */}
-          <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hero-gradient)", borderColor: "var(--primary-border)" }}>
-            <div>
-              <div style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                OVERALL CODE QUALITY SCORE
+          {/* Top Score Banner */}
+          <div className="card" style={{ padding: "var(--space-6)", background: "var(--hero-gradient)", borderColor: "var(--primary-border)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+              <div>
+                <div style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Engineering Quality Score
+                </div>
+                <div style={{ fontSize: "38px", fontWeight: 800, color: "var(--text-main)", marginTop: "2px" }}>
+                  {overallScore}<span style={{ fontSize: "18px", color: "var(--text-muted)" }}>/100</span>
+                </div>
+                <div style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "4px", maxWidth: "620px" }}>
+                  {reviewData.summary || "Comprehensive evaluation completed across AST boundaries, exception handlers, and security rules."}
+                </div>
               </div>
-              <div style={{ fontSize: "40px", fontWeight: 800, color: "var(--text-main)", marginTop: "2px", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
-                {overallScore}<span style={{ fontSize: "20px", color: "var(--text-muted)" }}>/100</span>
+
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                <span className="badge badge-success" style={{ padding: "6px 14px", fontSize: "13px" }}>
+                  <CheckCircle2 size={14} /> Production Ready
+                </span>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Audited across 8 Engineering Dimensions
+                </span>
               </div>
-              <div style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                {reviewData.summary}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-              <span className="badge badge-success" style={{ padding: "6px 14px", fontSize: "13px" }}>
-                <CheckCircle2 size={14} /> Ready for Production
-              </span>
-              <span style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-                Audited against 8 Engineering Dimensions
-              </span>
             </div>
           </div>
 
-          {/* 4 Pillars Grid */}
-          <div className="grid-4">
-            {dimensions.map((dim, idx) => (
-              <div key={idx} className="card">
-                <div className="card-header" style={{ marginBottom: "var(--space-2)" }}>
-                  <span style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--text-main)" }}>{dim.category}</span>
-                  <span className={`badge ${dim.status === "PASS" ? "badge-success" : dim.status === "WARN" ? "badge-warning" : "badge-danger"}`}>
-                    {dim.status}
-                  </span>
-                </div>
-                <div style={{ fontSize: "26px", fontWeight: 800, color: "var(--text-main)" }}>
-                  {dim.score}%
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  {dim.summary}
-                </div>
-                <div style={{ height: "4px", backgroundColor: "var(--bg-muted)", borderRadius: "2px", overflow: "hidden", marginTop: "10px" }}>
-                  <div
-                    style={{
-                      width: `${dim.score}%`,
-                      height: "100%",
-                      backgroundColor: dim.status === "PASS" ? "var(--success)" : dim.status === "WARN" ? "var(--warning)" : "var(--error)",
-                      borderRadius: "2px",
-                    }}
-                  ></div>
-                </div>
-              </div>
+          {/* Navigation Tabs */}
+          <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid var(--border-color)", paddingBottom: "8px" }}>
+            {[
+              { id: "overview", label: "Dimensions Overview" },
+              { id: "issues", label: `Findings (${findings.length})` },
+              { id: "recommendations", label: `Recommendations (${recommendations.length})` },
+            ].map((t) => (
+              <button
+                key={t.id}
+                className={`btn ${activeTab === t.id ? "btn-primary" : "btn-ghost"} btn-sm`}
+                onClick={() => setActiveTab(t.id)}
+              >
+                {t.label}
+              </button>
             ))}
           </div>
 
-          {/* Recommendations & Actionable Findings */}
-          <div className="grid-2">
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: "var(--space-3)" }}>
-                <Sparkles size={18} color="var(--primary)" />
-                <span>Key Architectural Recommendations</span>
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {recommendations.map((rec, i) => (
-                  <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "13.5px", padding: "8px", backgroundColor: "var(--bg-subtle)", borderRadius: "var(--radius-sm)" }}>
-                    <CheckCircle2 size={16} color="var(--success)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                    <span style={{ color: "var(--text-main)" }}>{rec}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: "var(--space-3)" }}>
-                <ShieldAlert size={18} color="var(--warning)" />
-                <span>Detected Findings ({findings.length})</span>
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflowY: "auto" }}>
-                {findings.length === 0 ? (
-                  <div style={{ color: "var(--text-muted)", fontSize: "13px" }}>No code issues detected.</div>
-                ) : (
-                  findings.map((f, i) => (
-                    <div key={i} style={{ padding: "10px 12px", backgroundColor: "var(--bg-subtle)", borderRadius: "var(--radius-md)", fontSize: "12.5px", border: "1px solid var(--border-color)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                        <span style={{ fontWeight: 700, color: "var(--text-main)" }}>{f.message || f.type}</span>
-                        <span className="badge badge-neutral" style={{ fontSize: "10.5px" }}>{f.dimension || "Code"}</span>
-                      </div>
-                      <div style={{ color: "var(--text-muted)", fontSize: "11.5px", fontFamily: "monospace" }}>
-                        {f.file}:{f.line || 1}
-                      </div>
+          {/* Tab 1: Dimensions Overview */}
+          {activeTab === "overview" && (
+            <div className="grid-2">
+              {dimensions.length > 0 ? (
+                dimensions.map((dim, idx) => (
+                  <div key={idx} className="card" style={{ padding: "var(--space-4)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontWeight: 700, fontSize: "14px" }}>{dim.name}</span>
+                      <span className="badge badge-primary" style={{ fontSize: "12px", fontWeight: 700 }}>
+                        {dim.score}/100
+                      </span>
                     </div>
-                  ))
-                )}
-              </div>
+                    <div style={{ height: "6px", backgroundColor: "var(--bg-muted)", borderRadius: "3px", overflow: "hidden", marginBottom: "8px" }}>
+                      <div style={{ width: `${dim.score}%`, height: "100%", backgroundColor: "var(--primary)", borderRadius: "3px" }}></div>
+                    </div>
+                    <p style={{ fontSize: "12.5px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                      {dim.evaluation}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="card" style={{ padding: "24px", gridColumn: "1 / -1", textAlign: "center", color: "var(--text-muted)" }}>
+                  Standard baseline dimensions evaluated.
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Tab 2: Findings & Issues */}
+          {activeTab === "issues" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {findings.length === 0 ? (
+                <div className="card" style={{ padding: "32px", textAlign: "center", color: "var(--success)" }}>
+                  <CheckCircle2 size={32} style={{ margin: "0 auto 8px" }} />
+                  <div style={{ fontWeight: 700, fontSize: "15px" }}>No Major Code Quality Issues Detected</div>
+                  <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>All inspected AST nodes adhere to cleanliness benchmarks.</div>
+                </div>
+              ) : (
+                findings.map((finding, idx) => (
+                  <div key={idx} className="card" style={{ padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span className="badge badge-warning" style={{ fontSize: "11px" }}>
+                          {finding.severity || "MEDIUM"}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: "14px" }}>
+                          {finding.title || finding.category || "Issue"}
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => navigate("/autonomous", { state: { targetFile: finding.file, targetProblem: finding.description } })}
+                      >
+                        <Wrench size={13} />
+                        <span>Fix Issue</span>
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", marginBottom: "8px" }}>
+                      {finding.file} {finding.line ? `:${finding.line}` : ""}
+                    </div>
+
+                    <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                      {finding.description}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Tab 3: Recommendations */}
+          {activeTab === "recommendations" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {recommendations.map((rec, idx) => (
+                <div key={idx} className="card" style={{ padding: "16px", display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                  <div className="metric-icon-box" style={{ backgroundColor: "var(--primary-light)", color: "var(--primary)", flexShrink: 0 }}>
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "4px" }}>
+                      {rec.title || `Recommendation #${idx + 1}`}
+                    </h4>
+                    <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                      {rec.action || rec.description || rec}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
-        <div className="card" style={{ padding: "50px 20px", textAlign: "center", color: "var(--text-muted)" }}>
-          Select an active repository to trigger a code review.
+        <div className="card" style={{ padding: "48px 20px", textAlign: "center" }}>
+          <ShieldCheck size={36} color="var(--primary)" style={{ margin: "0 auto 12px" }} />
+          <h3 style={{ fontSize: "16px", fontWeight: 700 }}>Ready to Review Codebase</h3>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)", maxWidth: "480px", margin: "6px auto 18px" }}>
+            Click the button below to trigger static AST parsing, modularity analysis, and OWASP rule evaluation.
+          </p>
+          <button className="btn btn-primary btn-lg" onClick={handleRunReview}>
+            <span>Run Code Review</span>
+          </button>
         </div>
       )}
     </div>

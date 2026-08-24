@@ -63,7 +63,7 @@ CODEAWARE/
 │   │   ├── agents/          # 15 Standardized specialist agents + Orchestrator
 │   │   ├── ai/              # Local deterministic reasoning engine & interfaces
 │   │   ├── analysis/        # AST parser (Python, JS/TS, Go, Java) & scanner
-│   │   ├── api/             # FastAPI REST endpoints
+│   │   ├── api/             # FastAPI REST endpoints (repositories, search, security, review, graph, autonomous, etc.)
 │   │   ├── config/          # Environment settings & directory paths
 │   │   ├── graph/           # Knowledge graph builder & impact analyzer
 │   │   ├── ml/              # 15-intent classifier with TF-IDF
@@ -75,14 +75,16 @@ CODEAWARE/
 │   └── .env.example         # Example configuration
 │
 └── frontend/
+    ├── public/
+    │   └── assets/          # SVG brand assets & product illustrations
     ├── src/
     │   ├── api/             # Unified HTTP API client & endpoint helpers
-    │   ├── components/      # Sidebar, CommandPalette, Toast
+    │   ├── components/      # Sidebar, CommandPalette, Toast, SourceViewer, DiffViewer
     │   ├── context/         # RepoContext (global state, health polling)
     │   ├── pages/           # Dashboard, Repositories, CodeSearch, AgentChat,
     │   │                    # CodeGraph, ImpactAnalysis, AutonomousFix,
-    │   │                    # CodeReview, TestGenerator, Settings
-    │   ├── index.css        # Light Theme design system
+    │   │                    # CodeReview, SecurityDashboard, TestGenerator, Settings
+    │   ├── index.css        # Modern Light Theme design system
     │   ├── App.jsx          # Route configuration
     │   └── main.jsx
     └── package.json
@@ -114,6 +116,13 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
+## ⌨️ Keyboard Shortcuts
+- `Ctrl+K` / `Cmd+K`: Open Command Palette to navigate features or switch repositories.
+- `Ctrl+P` / `Cmd+P`: Quick search across files, symbols, and commands.
+- `Esc`: Close open modal overlays.
+
+---
+
 ## 🧪 Running Tests
 
 ```bash
@@ -124,6 +133,7 @@ python -m unittest tests.test_codeaware -v
 ---
 
 ## 🔒 Security & Path Safety
-- Repository ingestion automatically ignores non-code directories (`.git`, `node_modules`, `venv`, `dist`, `.env`, binaries).
-- Patch application creates automatic backups and rolls back if an error occurs.
-- ValidationAgent compiles and runs test assertions inside isolated temporary directories.
+- **Path Traversal Protection**: All file read/write operations strictly validate that target paths resolve within the active repository root.
+- **Automated Patch Backups**: Patch application creates automatic timestamped `.bak` copies and rolls back on error.
+- **Isolated Validation**: Syntax validation and test verification are performed in isolated sandboxes before changes are presented to the developer.
+- **OWASP Top 10 Static Audit**: Proactively catches SQL injection, hardcoded secrets, unsafe deserialization, and dangerous eval/exec calls.

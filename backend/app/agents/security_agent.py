@@ -88,6 +88,22 @@ class SecurityAgent(BaseAgent):
             "pattern": r"allow_origins\s*=\s*\[\s*['\"]\*['\"]\s*\]\s*,\s*allow_credentials\s*=\s*True",
             "message": "Permissive CORS wildcard with allow_credentials=True allows cross-site data theft.",
             "recommendation": "Specify explicit trusted origins when credentials/cookies are enabled."
+        },
+        {
+            "id": "SEC-009",
+            "type": "debug_mode_enabled",
+            "severity": "LOW",
+            "pattern": r"(?:DEBUG\s*=\s*True|app\.run\s*\([^)]*debug\s*=\s*True)",
+            "message": "Debug mode enabled in code may leak stack traces or sensitive environment data.",
+            "recommendation": "Disable debug mode in production via environment flags."
+        },
+        {
+            "id": "SEC-010",
+            "type": "insecure_http_url",
+            "severity": "LOW",
+            "pattern": r"http://(?!localhost|127\.0\.0\.1|0\.0\.0\.0)[A-Za-z0-9\.\-]+",
+            "message": "Insecure HTTP protocol used instead of encrypted HTTPS transport.",
+            "recommendation": "Upgrade plaintext HTTP endpoints to HTTPS."
         }
     ]
 
@@ -146,13 +162,18 @@ class SecurityAgent(BaseAgent):
         critical_count = sum(1 for f in findings if f["severity"] == "CRITICAL")
         high_count = sum(1 for f in findings if f["severity"] == "HIGH")
         med_count = sum(1 for f in findings if f["severity"] == "MEDIUM")
+        low_count = sum(1 for f in findings if f["severity"] == "LOW")
+
+        penalty = (critical_count * 25) + (high_count * 15) + (med_count * 8) + (low_count * 3)
+        security_score = max(0, min(100, 100 - penalty))
 
         recommendations = list(dict.fromkeys([f["recommendation"] for f in findings]))
         affected_files = list(dict.fromkeys([f["file"] for f in findings]))
 
         summary = (
             f"Security scan completed across {len(files_scanned)} files. "
-            f"Found {len(findings)} security issues ({critical_count} Critical, {high_count} High, {med_count} Medium)."
+            f"Health Score: {security_score}/100. "
+            f"Found {len(findings)} security issues ({critical_count} Critical, {high_count} High, {med_count} Medium, {low_count} Low)."
         )
 
         return self.create_response(
@@ -171,11 +192,14 @@ class SecurityAgent(BaseAgent):
             raw_data={
                 "files_scanned_count": len(files_scanned),
                 "total_vulnerabilities": len(findings),
+                "security_score": security_score,
                 "critical": critical_count,
                 "high": high_count,
                 "medium": med_count,
+                "low": low_count,
             }
         )
+
 
     def _scan_source(self, code: str, file_path: str) -> List[Dict[str, Any]]:
         findings = []

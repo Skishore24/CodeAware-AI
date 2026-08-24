@@ -10,6 +10,8 @@ from app.services.rag_service import RAGService
 from app.services.repository_ingestion import RepositoryIngestionService
 from app.analysis.repository_scanner import RepositoryScanner
 from app.analysis.code_analyzer import CodeAnalyzer
+from app.db.database import get_db, SessionLocal
+from app.db.models import Repository as DBRepository
 
 router = APIRouter(
     prefix="/repositories",
@@ -225,6 +227,28 @@ def scan_repository(
 
         result = scanner.scan()
 
+        # Persist to MySQL database
+        if SessionLocal:
+            try:
+                with SessionLocal() as db:
+                    repo_name = repository_path.name
+                    existing = db.query(DBRepository).filter(DBRepository.name == repo_name).first()
+                    if not existing:
+                        existing = DBRepository(
+                            name=repo_name,
+                            local_path=str(repository_path),
+                        )
+                        db.add(existing)
+                    existing.files_count = result.get("total_files", 0)
+                    existing.primary_language = result.get("primary_language", "General")
+                    existing.total_functions = result.get("total_functions", 0)
+                    existing.total_classes = result.get("total_classes", 0)
+                    existing.languages_json = result.get("languages", {})
+                    existing.frameworks_json = result.get("frameworks", [])
+                    db.commit()
+            except Exception as dberr:
+                pass
+
         return {
 
             "success": True,
@@ -263,20 +287,105 @@ def analyze_code(
         result = analyzer.analyze()
 
         return {
-
             "success": True,
-
-            "message": (
-                "Code analysis completed."
-            ),
-
+            "message": "Code analysis completed.",
             "analysis": result,
-
         }
-
     except Exception as exc:
-
         raise HTTPException(
             status_code=500,
             detail=str(exc),
         )
+
+
+# ---------------------------------------------------------
+# Get File Content (Secure Source Viewer Endpoint)
+# ---------------------------------------------------------
+
+class FileContentRequest(BaseModel):
+    repository_name: Optional[str] = None
+    repository_path: Optional[str] = None
+    file_path: str
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None
+
+
+@router.post("/file-content")
+def get_file_content(request: FileContentRequest):
+    repo_path = _resolve_repo_path(
+        request.repository_name,
+        request.repository_path
+    )
+
+    # Sanitize and resolve file path
+    clean_rel_path = request.file_path.lstrip("/\\")
+    target_file = (repo_path / clean_rel_path).resolve()
+
+    # Security: Ensure target file is within repo_path
+    try:
+        target_file.relative_to(repo_path.resolve())
+    except ValueError:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Path traversal outside repository root is disallowed."
+        )
+
+    if not target_file.exists() or not target_file.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {request.file_path}"
+        )
+
+    try:
+        content = target_file.read_text(encoding="utf-8", errors="ignore")
+        lines = content.splitlines()
+        total_lines = len(lines)
+
+        ext = target_file.suffix.lower()
+        language_map = {
+            ".py": "python",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".json": "json",
+            ".md": "markdown",
+            ".html": "html",
+            ".css": "css",
+            ".go": "go",
+            ".java": "java",
+            ".cpp": "cpp",
+            ".c": "c",
+            ".cs": "csharp",
+            ".rs": "rust",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".sh": "bash",
+        }
+        lang = language_map.get(ext, "plaintext")
+
+        start = max(1, request.start_line) if request.start_line else 1
+        end = min(total_lines, request.end_line) if request.end_line else total_lines
+
+        sliced_lines = [
+            {"line_number": i, "content": lines[i - 1]}
+            for i in range(start, min(end + 1, total_lines + 1))
+        ]
+
+        return {
+            "success": True,
+            "file_path": str(target_file.relative_to(repo_path.resolve())).replace("\\", "/"),
+            "absolute_path": str(target_file),
+            "language": lang,
+            "total_lines": total_lines,
+            "start_line": start,
+            "end_line": end,
+            "content": content,
+            "lines": sliced_lines,
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read file: {exc}"
+        )
+

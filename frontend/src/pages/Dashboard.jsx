@@ -14,16 +14,17 @@ import {
   Sparkles,
   GitGraph,
   GitFork,
-  Cpu,
-  Layers,
-  Terminal,
-  Zap,
   ShieldAlert,
   ArrowUpRight,
+  Layers,
+  Zap,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { scanRepository } from "../api/repositories";
 import { runSecurityScan } from "../api/security";
+import HeroIllustration from "../components/visual/HeroIllustration";
+import PipelineSteps from "../components/visual/PipelineSteps";
+import Tooltip from "../components/common/Tooltip";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ export default function Dashboard() {
             functions: analysis.total_functions || 0,
             classes: analysis.total_classes || 0,
             languages: analysis.languages || {},
-            primaryLanguage: analysis.primary_language || "Code",
+            primaryLanguage: analysis.primary_language || "General Code",
             frameworks: analysis.frameworks || [],
             entryPoints: analysis.entry_points || [],
             securityIssues: secCount,
@@ -81,12 +82,74 @@ export default function Dashboard() {
     };
   }, [activeRepo]);
 
-  const getTimeGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
+  const featureCards = [
+    {
+      id: "search",
+      name: "Natural Language Code Search",
+      icon: Search,
+      color: "var(--primary)",
+      bg: "var(--primary-light)",
+      desc: "Ask questions in plain English and instantly locate relevant functions, files, routes, and AST symbols.",
+      how: "Hybrid AST & semantic vector matching with exact file line citations.",
+      cta: "Search Code",
+      path: "/search",
+    },
+    {
+      id: "review",
+      name: "AI Code Review",
+      icon: ShieldCheck,
+      color: "var(--success)",
+      bg: "var(--success-light)",
+      desc: "Evaluate code quality, modularity, exception handling, and engineering architecture across 8 dimensions.",
+      how: "Static heuristics combined with deterministic rules for code maintainability.",
+      cta: "Run Review",
+      path: "/review",
+    },
+    {
+      id: "security",
+      name: "Security & Vulnerability Audit",
+      icon: ShieldAlert,
+      color: "var(--error)",
+      bg: "var(--error-light)",
+      desc: "Detect SQL injection, hardcoded API secrets, unsafe eval() execution, and OWASP Top 10 flaws.",
+      how: "Deterministic vulnerability pattern matching with remediation guidance.",
+      cta: "Scan Security",
+      path: "/security",
+    },
+    {
+      id: "graph",
+      name: "Knowledge Graph & Topology",
+      icon: GitGraph,
+      color: "var(--purple)",
+      bg: "var(--purple-light)",
+      desc: "Visualize cross-file relationships, inheritance trees, function call graphs, and module dependencies.",
+      how: "Interactive node graph mapping callers, callees, and imported definitions.",
+      cta: "Explore Graph",
+      path: "/graph",
+    },
+    {
+      id: "impact",
+      name: "Blast Radius & Impact Analysis",
+      icon: GitFork,
+      color: "var(--info)",
+      bg: "var(--info-light)",
+      desc: "Calculate what will break before modifying any class, function, or API handler.",
+      how: "Recursively traces inbound callers and dependent modules with risk scoring.",
+      cta: "Analyze Impact",
+      path: "/impact",
+    },
+    {
+      id: "autonomous",
+      name: "Autonomous Fix & Patching",
+      icon: Wrench,
+      color: "var(--warning)",
+      bg: "var(--warning-light)",
+      desc: "Generate targeted code fixes, inspect side-by-side diffs, and validate changes before applying.",
+      how: "Isolated patch synthesis with regression test generation and safe review gates.",
+      cta: "Find Fixes",
+      path: "/autonomous",
+    },
+  ];
 
   const languageColors = {
     Python: "#3B82F6",
@@ -102,283 +165,188 @@ export default function Dashboard() {
 
   return (
     <div className="page-container">
-      {/* Hero Welcome Banner */}
-      <div className="hero-banner">
-        <div className="hero-content">
-          <div className="hero-tag">
-            <Sparkles size={13} />
-            <span>CodeAware Intelligence Platform</span>
+      {/* Hero Section with Product Concept & Architecture Illustration */}
+      <div className="hero-card">
+        <div className="hero-grid">
+          <div>
+            <div className="hero-tag">
+              <Sparkles size={13} />
+              <span>AI Code Intelligence Platform</span>
+            </div>
+            <h1 className="hero-title">
+              Understand your codebase with AI
+            </h1>
+            <p className="hero-subtitle">
+              Search code, explore architecture, detect security risks, understand dependencies, and get actionable engineering insights from one unified workspace.
+            </p>
+
+            <div className="hero-actions">
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={() => navigate(activeRepo ? "/search" : "/repos")}
+              >
+                <Search size={16} />
+                <span>{activeRepo ? "Search Code" : "Connect Repository"}</span>
+              </button>
+              <button
+                className="btn btn-secondary btn-lg"
+                onClick={() => navigate("/agent")}
+              >
+                <Bot size={16} />
+                <span>Ask AI Assistant</span>
+              </button>
+
+              {activeRepo ? (
+                <span className="badge badge-success" style={{ padding: "6px 12px", fontSize: "12.5px" }}>
+                  <CheckCircle2 size={13} /> Active: {activeRepo.name}
+                </span>
+              ) : (
+                <span className="badge badge-warning" style={{ padding: "6px 12px", fontSize: "12.5px" }}>
+                  No repository active
+                </span>
+              )}
+            </div>
           </div>
-          <h1 className="hero-title">
-            {getTimeGreeting()}, Developer
-          </h1>
-          <p className="hero-desc">
-            {activeRepo ? (
-              <>
-                Active repository: <strong style={{ color: "var(--text-main)" }}>{activeRepo.name}</strong>.
-                {" "}Explore symbols, inspect architecture boundaries, detect security risks, and trigger safe automated fixes.
-              </>
-            ) : (
-              "Welcome to CodeAware AI. Clone or select a repository to unlock local code intelligence, AST symbol navigation, and multi-agent assistance."
-            )}
+
+          <div>
+            <HeroIllustration />
+          </div>
+        </div>
+      </div>
+
+      {/* Real Repository Snapshot Metrics */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+          <div>
+            <h2 style={{ fontSize: "17px", fontWeight: 800 }}>Repository Snapshot</h2>
+            <p style={{ fontSize: "12.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+              {activeRepo ? `Verified metadata for ${activeRepo.name}` : "Connect a repository to view live code metrics"}
+            </p>
+          </div>
+          {activeRepo && (
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate("/repos")}>
+              <span>Switch Repository</span>
+              <ArrowRight size={13} />
+            </button>
+          )}
+        </div>
+
+        <div className="grid-4">
+          {/* Files */}
+          <div className="metric-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ fontSize: "12.5px", color: "var(--text-muted)", fontWeight: 600 }}>Source Files</div>
+              <div className="metric-icon-box" style={{ backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                <FolderGit2 size={18} />
+              </div>
+            </div>
+            <div className="metric-value">
+              {stats.loading ? "..." : (stats.files || (activeRepo ? "Ready" : "0"))}
+            </div>
+            <div className="metric-sub">
+              <CheckCircle2 size={12} color="var(--success)" />
+              <span>{activeRepo ? "Indexed in AST Symbol Map" : "Awaiting repository"}</span>
+            </div>
+          </div>
+
+          {/* Primary Language */}
+          <div className="metric-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ fontSize: "12.5px", color: "var(--text-muted)", fontWeight: 600 }}>Primary Language</div>
+              <div className="metric-icon-box" style={{ backgroundColor: "var(--info-light)", color: "var(--info)" }}>
+                <FileCode2 size={18} />
+              </div>
+            </div>
+            <div className="metric-value" style={{ fontSize: "20px" }}>
+              {stats.loading ? "..." : stats.primaryLanguage}
+            </div>
+            <div className="metric-sub">
+              <span>{Object.keys(stats.languages).length > 0 ? `${Object.keys(stats.languages).length} languages detected` : "AST parsed"}</span>
+            </div>
+          </div>
+
+          {/* Security Posture */}
+          <div className="metric-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ fontSize: "12.5px", color: "var(--text-muted)", fontWeight: 600 }}>Security Posture</div>
+              <div
+                className="metric-icon-box"
+                style={{
+                  backgroundColor: stats.securityIssues > 0 ? "var(--warning-light)" : "var(--success-light)",
+                  color: stats.securityIssues > 0 ? "var(--warning)" : "var(--success)",
+                }}
+              >
+                <ShieldCheck size={18} />
+              </div>
+            </div>
+            <div className="metric-value" style={{ color: stats.securityIssues > 0 ? "var(--warning)" : "var(--success)" }}>
+              {stats.loading ? "..." : activeRepo ? (stats.securityIssues === 0 ? "Protected" : `${stats.securityIssues} Issues`) : "Ready to Scan"}
+            </div>
+            <div className="metric-sub">
+              <span>Static OWASP audit available</span>
+            </div>
+          </div>
+
+          {/* Specialist Agents */}
+          <div className="metric-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ fontSize: "12.5px", color: "var(--text-muted)", fontWeight: 600 }}>AI Engineering Agents</div>
+              <div className="metric-icon-box" style={{ backgroundColor: "var(--purple-light)", color: "var(--purple)" }}>
+                <Bot size={18} />
+              </div>
+            </div>
+            <div className="metric-value">15 Ready</div>
+            <div className="metric-sub">
+              <span style={{ color: "var(--success)", fontWeight: 600 }}>● Multi-Agent Orchestrator</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* "What can CodeAware AI do?" Section */}
+      <div>
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text-main)" }}>
+            What can CodeAware AI do?
+          </h2>
+          <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
+            Explore the six core intelligence capabilities designed to analyze, secure, and accelerate development.
           </p>
-
-          <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-            <button className="btn btn-primary" onClick={() => navigate(activeRepo ? "/search" : "/repos")}>
-              <Search size={15} />
-              <span>{activeRepo ? "Search Codebase" : "Select Repository"}</span>
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate("/agent")}>
-              <Bot size={15} />
-              <span>Ask AI Agents</span>
-            </button>
-          </div>
         </div>
 
-        {/* Decorative Status Badge Box */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", zIndex: 1 }}>
-          <div style={{ padding: "12px 18px", backgroundColor: "white", borderRadius: "var(--radius-lg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-xs)" }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>
-              Inference Mode
-            </div>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--success)", display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
-              <span className="status-dot healthy"></span> 100% Local-First
-            </div>
-          </div>
+        <div className="feature-grid">
+          {featureCards.map((feat) => {
+            const Icon = feat.icon;
+            return (
+              <div key={feat.id} className="feature-card">
+                <div>
+                  <div className="feature-icon-box" style={{ backgroundColor: feat.bg, color: feat.color }}>
+                    <Icon size={20} />
+                  </div>
+                  <h3 className="feature-title">{feat.name}</h3>
+                  <p className="feature-desc">{feat.desc}</p>
+                  <div className="feature-how">
+                    <strong style={{ color: "var(--text-main)" }}>How it works: </strong>
+                    {feat.how}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => navigate(feat.path)}
+                  style={{ width: "100%", justifyContent: "space-between", marginTop: "8px" }}
+                >
+                  <span>{feat.cta}</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Primary Metrics Grid */}
-      <div className="grid-4" style={{ marginBottom: "var(--space-6)" }}>
-        {/* Metric 1: Files */}
-        <div className="metric-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 600 }}>Source Files</div>
-            <div className="metric-icon-box" style={{ backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
-              <FolderGit2 size={18} />
-            </div>
-          </div>
-          <div className="metric-value">
-            {stats.loading ? "..." : stats.files.toLocaleString()}
-          </div>
-          <div className="metric-sub">
-            <CheckCircle2 size={12} color="var(--success)" />
-            <span>Indexed in AST Symbol Index</span>
-          </div>
-        </div>
-
-        {/* Metric 2: Primary Tech */}
-        <div className="metric-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 600 }}>Primary Language</div>
-            <div className="metric-icon-box" style={{ backgroundColor: "var(--info-light)", color: "var(--info)" }}>
-              <FileCode2 size={18} />
-            </div>
-          </div>
-          <div className="metric-value" style={{ fontSize: "22px" }}>
-            {stats.loading ? "..." : stats.primaryLanguage}
-          </div>
-          <div className="metric-sub">
-            <span>{Object.keys(stats.languages).length} language distributions</span>
-          </div>
-        </div>
-
-        {/* Metric 3: Security Posture */}
-        <div className="metric-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 600 }}>Security Posture</div>
-            <div
-              className="metric-icon-box"
-              style={{
-                backgroundColor: stats.securityIssues > 0 ? "var(--warning-light)" : "var(--success-light)",
-                color: stats.securityIssues > 0 ? "var(--warning)" : "var(--success)",
-              }}
-            >
-              <ShieldCheck size={18} />
-            </div>
-          </div>
-          <div className="metric-value" style={{ color: stats.securityIssues > 0 ? "var(--warning)" : "var(--success)" }}>
-            {stats.loading ? "..." : stats.securityIssues === 0 ? "Protected" : `${stats.securityIssues} Issues`}
-          </div>
-          <div className="metric-sub">
-            <span>Static OWASP & Vulnerability Scan</span>
-          </div>
-        </div>
-
-        {/* Metric 4: AI Engine */}
-        <div className="metric-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 600 }}>Specialist Agents</div>
-            <div className="metric-icon-box" style={{ backgroundColor: "var(--purple-light)", color: "var(--purple)" }}>
-              <Bot size={18} />
-            </div>
-          </div>
-          <div className="metric-value">15 Ready</div>
-          <div className="metric-sub">
-            <span style={{ color: "var(--success)", fontWeight: 600 }}>● Multi-Agent Orchestrator</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main 2-Column Section */}
-      <div className="grid-2" style={{ marginBottom: "var(--space-6)" }}>
-        {/* Left Column: Repository Intelligence Overview */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">
-              <Activity size={18} color="var(--primary)" />
-              <span>Repository Intelligence & Health</span>
-            </h2>
-            <span className="badge badge-success">Verified Baseline</span>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Framework Badges */}
-            <div>
-              <div style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px" }}>
-                Detected Tech Stack & Frameworks:
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {stats.frameworks.length > 0 ? (
-                  stats.frameworks.map((fw, idx) => (
-                    <span key={idx} className="badge badge-primary" style={{ padding: "4px 10px" }}>
-                      <Boxes size={12} /> {fw}
-                    </span>
-                  ))
-                ) : (
-                  <span className="badge badge-neutral">Standard Library / Python / JS</span>
-                )}
-              </div>
-            </div>
-
-            {/* Health Bars */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
-                <span style={{ fontWeight: 500 }}>Code Health & Syntax Integrity</span>
-                <span style={{ fontWeight: 600, color: "var(--success)" }}>94%</span>
-              </div>
-              <div style={{ height: "6px", backgroundColor: "var(--bg-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: "94%", height: "100%", backgroundColor: "var(--success)", borderRadius: "3px" }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
-                <span style={{ fontWeight: 500 }}>Architecture Modularity</span>
-                <span style={{ fontWeight: 600, color: "var(--primary)" }}>88%</span>
-              </div>
-              <div style={{ height: "6px", backgroundColor: "var(--bg-muted)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: "88%", height: "100%", backgroundColor: "var(--primary)", borderRadius: "3px" }}></div>
-              </div>
-            </div>
-
-            {/* Language Breakdown */}
-            {Object.keys(stats.languages).length > 0 && (
-              <div style={{ marginTop: "4px" }}>
-                <div style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px" }}>
-                  Language Distribution:
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                  {Object.entries(stats.languages).slice(0, 5).map(([lang, count], i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px" }}>
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          backgroundColor: languageColors[lang] || "#64748B",
-                        }}
-                      ></span>
-                      <span style={{ fontWeight: 600 }}>{lang}</span>
-                      <span style={{ color: "var(--text-muted)" }}>({count})</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Quick Workflows */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">
-              <Zap size={18} color="var(--warning)" />
-              <span>Developer Workflows</span>
-            </h2>
-            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>One-click actions</span>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div
-              className="card card-interactive"
-              style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-              onClick={() => navigate("/search")}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div className="metric-icon-box" style={{ backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
-                  <Search size={16} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "13.5px" }}>Natural Language Code Search</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>Search symbols, endpoints, and logic with citations</div>
-                </div>
-              </div>
-              <ArrowRight size={16} color="var(--text-subtle)" />
-            </div>
-
-            <div
-              className="card card-interactive"
-              style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-              onClick={() => navigate("/review")}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div className="metric-icon-box" style={{ backgroundColor: "var(--success-light)", color: "var(--success)" }}>
-                  <CheckCircle2 size={16} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "13.5px" }}>Full Engineering Code Review</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>Evaluate correctness, OWASP security, and complexity</div>
-                </div>
-              </div>
-              <ArrowRight size={16} color="var(--text-subtle)" />
-            </div>
-
-            <div
-              className="card card-interactive"
-              style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-              onClick={() => navigate("/impact")}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div className="metric-icon-box" style={{ backgroundColor: "var(--info-light)", color: "var(--info)" }}>
-                  <GitFork size={16} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "13.5px" }}>Blast Radius & Impact Analysis</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>Calculate callers, callees, and broken test risks</div>
-                </div>
-              </div>
-              <ArrowRight size={16} color="var(--text-subtle)" />
-            </div>
-
-            <div
-              className="card card-interactive"
-              style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-              onClick={() => navigate("/autonomous")}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div className="metric-icon-box" style={{ backgroundColor: "var(--warning-light)", color: "var(--warning)" }}>
-                  <Wrench size={16} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "13.5px" }}>Autonomous Fix & Safe Patching</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>Unified diff preview, test validation, and rollback</div>
-                </div>
-              </div>
-              <ArrowRight size={16} color="var(--text-subtle)" />
-            </div>
-          </div>
-        </div>
+      {/* 4-Step "How CodeAware Works" Flow */}
+      <div className="card" style={{ padding: "var(--space-6)" }}>
+        <PipelineSteps />
       </div>
     </div>
   );

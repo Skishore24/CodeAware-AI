@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   FileCode,
@@ -15,40 +15,45 @@ import {
   Layers,
   GitFork,
   Bot,
+  FileText,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { searchCode } from "../api/rag";
 import { useToast } from "../components/Toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import SourceViewer from "../components/SourceViewer";
+import EmptyState from "../components/feedback/EmptyState";
+import { SearchResultSkeleton } from "../components/feedback/Skeleton";
 
 export default function CodeSearch() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { activeRepo } = useRepo();
   const { addToast } = useToast();
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [selectedResult, setSelectedResult] = useState(null);
-  const [copied, setCopied] = useState(false);
 
   // Filters
   const [languageFilter, setLanguageFilter] = useState("");
   const [filePathFilter, setFilePathFilter] = useState("");
 
-  const quickSearchPresets = [
-    "Where is authentication or login handled?",
-    "Find all database query operations",
-    "List API route endpoints and handlers",
-    "Find exception handling and error blocks",
+  const searchPresets = [
+    "Where is authentication implemented?",
+    "Find database queries and models",
+    "Show API endpoints and route handlers",
+    "Where is error handling and exception logging?",
+    "Find configuration loading and environment variables",
   ];
 
   const handleSearch = async (targetQuery) => {
-    const q = (targetQuery || query).trim();
+    const q = (targetQuery !== undefined ? targetQuery : query).trim();
     if (!q) return;
 
     if (!activeRepo) {
-      addToast("Please select a repository first.", "warning");
+      addToast("Please connect or select a repository first.", "warning");
       return;
     }
 
@@ -73,78 +78,106 @@ export default function CodeSearch() {
     }
   };
 
-  const copySnippet = () => {
-    if (!selectedResult?.content) return;
-    navigator.clipboard.writeText(selectedResult.content);
-    setCopied(true);
-    addToast("Code snippet copied to clipboard", "info");
-    setTimeout(() => setCopied(false), 2000);
-  };
+  useEffect(() => {
+    const initialQ = searchParams.get("q");
+    if (initialQ && activeRepo) {
+      setQuery(initialQ);
+      handleSearch(initialQ);
+    }
+  }, [activeRepo, searchParams]);
+
+  if (!activeRepo) {
+    return (
+      <div className="page-container">
+        <EmptyState
+          icon={Search}
+          title="No Repository Active for Search"
+          description="Connect or select a repository to search across functions, AST symbols, API endpoints, and source code using natural language."
+          actionText="Select Repository"
+          actionPath="/repos"
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="page-container" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)" }}>
+    <div className="page-container" style={{ height: "calc(100vh - 100px)", display: "flex", flexDirection: "column" }}>
       {/* Header */}
-      <div className="page-header" style={{ marginBottom: "var(--space-4)" }}>
+      <div className="page-header" style={{ marginBottom: "var(--space-2)" }}>
         <div>
-          <h1 className="page-title">Code Search & Discovery</h1>
-          <p className="page-subtitle">
-            Natural language and symbol-based hybrid search with AST-aware relevance scoring.
+          <h1 className="page-title" style={{ fontSize: "20px", fontWeight: 800 }}>
+            Natural Language Code Search
+          </h1>
+          <p className="page-subtitle" style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            Searching codebase: <strong style={{ color: "var(--text-main)" }}>{activeRepo.name}</strong> with AST symbol ranking and semantic citations.
           </p>
         </div>
       </div>
 
-      {/* Search Bar & Filters */}
-      <div className="card" style={{ padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-3)" }}>
-        <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      {/* Large Search Box */}
+      <div className="card" style={{ padding: "var(--space-4)", marginBottom: "var(--space-3)" }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSearch();
+          }}
+          style={{ display: "flex", gap: "10px", alignItems: "center" }}
+        >
           <div style={{ position: "relative", flex: 1 }}>
             <input
               type="text"
               className="input"
-              placeholder="e.g. Where is token verification implemented? / Find all SQL queries / authenticate_user"
+              placeholder="Ask anything about your codebase (e.g. Where is authentication handled?)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              style={{ paddingLeft: "34px", fontSize: "14px" }}
+              style={{ paddingLeft: "36px", paddingRight: "12px", fontSize: "14px", height: "42px" }}
             />
-            <Search size={16} color="var(--text-subtle)" style={{ position: "absolute", left: "10px", top: "11px" }} />
+            <Search
+              size={16}
+              color="var(--text-subtle)"
+              style={{ position: "absolute", left: "12px", top: "13px" }}
+            />
           </div>
 
-          <input
-            type="text"
-            className="input"
-            placeholder="Language (py, js, ts)"
-            value={languageFilter}
-            onChange={(e) => setLanguageFilter(e.target.value)}
-            style={{ width: "160px" }}
-          />
-
-          <input
-            type="text"
-            className="input"
-            placeholder="Path filter (e.g. api/)"
-            value={filePathFilter}
-            onChange={(e) => setFilePathFilter(e.target.value)}
-            style={{ width: "160px" }}
-          />
-
-          <button type="submit" className="btn btn-primary" disabled={searching || !query.trim()}>
-            {searching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-            <span>Search</span>
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
+            disabled={searching || !query.trim()}
+          >
+            {searching ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Searching...</span>
+              </>
+            ) : (
+              <>
+                <Search size={16} />
+                <span>Search</span>
+              </>
+            )}
           </button>
         </form>
 
-        {/* Quick query chips */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>
-            Suggestions:
+        {/* Suggestion Chips */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-muted)" }}>
+            Try asking:
           </span>
-          {quickSearchPresets.map((preset, idx) => (
+          {searchPresets.map((preset, idx) => (
             <button
               key={idx}
-              className="btn btn-secondary btn-sm"
-              style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "var(--radius-full)" }}
+              type="button"
+              className="btn btn-ghost btn-sm"
               onClick={() => {
                 setQuery(preset);
                 handleSearch(preset);
+              }}
+              style={{
+                fontSize: "11.5px",
+                padding: "3px 8px",
+                backgroundColor: "var(--bg-muted)",
+                borderRadius: "var(--radius-full)",
+                border: "1px solid var(--border-color)",
               }}
             >
               {preset}
@@ -153,20 +186,33 @@ export default function CodeSearch() {
         </div>
       </div>
 
-      {/* Split Results Workspace */}
-      <div style={{ flex: 1, display: "flex", gap: "var(--space-4)", minHeight: 0 }}>
-        {/* Left Results List */}
-        <div className="card" style={{ width: "440px", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-subtle)", fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
-            <span>MATCHED CODE CHUNKS ({results.length})</span>
-            <span>RELEVANCE SCORE</span>
+      {/* Main Results & Source Viewer Split */}
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "var(--space-4)" }}>
+        {/* Left Column: Results List */}
+        <div className="card" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div className="card-header" style={{ padding: "10px 14px" }}>
+            <div style={{ fontSize: "13px", fontWeight: 700 }}>
+              Search Results {results.length > 0 && `(${results.length})`}
+            </div>
+            {results.length > 0 && (
+              <span className="badge badge-primary" style={{ fontSize: "11px" }}>
+                Ranked by AST Relevance
+              </span>
+            )}
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-            {results.length === 0 ? (
-              <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: "13.5px" }}>
-                <Search size={32} color="var(--text-subtle)" style={{ margin: "0 auto 8px" }} />
-                <div>{searching ? "Scanning codebase & computing hybrid scores..." : "Enter a search query or click a suggestion above."}</div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            {searching ? (
+              <SearchResultSkeleton />
+            ) : results.length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+                <FileCode size={32} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-main)" }}>
+                  No search query entered
+                </div>
+                <div style={{ fontSize: "12px", marginTop: "4px" }}>
+                  Type a natural language question or pick a suggested prompt above.
+                </div>
               </div>
             ) : (
               results.map((item, idx) => {
@@ -174,37 +220,47 @@ export default function CodeSearch() {
                 return (
                   <div
                     key={idx}
+                    className="card card-interactive"
                     onClick={() => setSelectedResult(item)}
                     style={{
                       padding: "10px 12px",
-                      borderRadius: "var(--radius-md)",
-                      marginBottom: "6px",
-                      cursor: "pointer",
-                      backgroundColor: isSelected ? "var(--primary-light)" : "var(--bg-surface)",
-                      border: isSelected ? "1px solid var(--primary-border)" : "1px solid var(--border-color)",
-                      boxShadow: isSelected ? "var(--shadow-sm)" : "none",
-                      transition: "var(--transition)",
+                      borderColor: isSelected ? "var(--primary)" : "var(--border-color)",
+                      backgroundColor: isSelected ? "var(--primary-light)" : "var(--bg-card)",
+                      borderRadius: "var(--radius-lg)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <FileCode size={14} color={isSelected ? "var(--primary)" : "var(--text-muted)"} />
-                        <span style={{ fontWeight: 700, fontSize: "13px", color: isSelected ? "var(--primary)" : "var(--text-main)" }}>
-                          {item.symbol || item.file.split("/").pop()}
+                        <Code2 size={14} color="var(--primary)" />
+                        <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--text-main)" }}>
+                          {item.symbol_name || item.name || (item.file_path ? item.file_path.split("/").pop() : "Symbol")}
                         </span>
                       </div>
-                      <span className={`badge ${isSelected ? "badge-primary" : "badge-neutral"}`} style={{ fontSize: "10.5px" }}>
-                        {item.score}
+                      <span className="badge badge-neutral" style={{ fontSize: "10.5px" }}>
+                        {item.symbol_type || item.type || "code"}
                       </span>
                     </div>
 
-                    <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginBottom: "4px", fontFamily: "monospace" }}>
-                      {item.file}:{item.start_line}-{item.end_line}
+                    <div style={{ fontSize: "11.5px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", wordBreak: "break-all" }}>
+                      {item.file_path} {item.line_number ? `:${item.line_number}` : ""}
                     </div>
 
-                    {item.why_matched && (
-                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", background: isSelected ? "rgba(255,255,255,0.7)" : "var(--bg-subtle)", padding: "3px 6px", borderRadius: "4px", marginTop: "2px" }}>
-                        {item.why_matched}
+                    {item.snippet && (
+                      <div
+                        style={{
+                          marginTop: "6px",
+                          padding: "6px 8px",
+                          backgroundColor: "var(--bg-code)",
+                          color: "#E2E8F0",
+                          borderRadius: "var(--radius-sm)",
+                          fontSize: "11px",
+                          fontFamily: "JetBrains Mono",
+                          maxHeight: "60px",
+                          overflow: "hidden",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {item.snippet}
                       </div>
                     )}
                   </div>
@@ -214,48 +270,18 @@ export default function CodeSearch() {
           </div>
         </div>
 
-        {/* Right Preview Pane */}
-        <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+        {/* Right Column: Source Code Inspector */}
+        <div className="card" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {selectedResult ? (
-            <>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "6px" }}>
-                    <FileCode size={16} color="var(--primary)" />
-                    <span>{selectedResult.file}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Lines {selectedResult.start_line}–{selectedResult.end_line} {selectedResult.symbol ? `• Symbol: ${selectedResult.symbol}` : ""}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <span className="badge badge-primary">{selectedResult.language || "code"}</span>
-                  <button className="btn btn-secondary btn-sm" onClick={copySnippet} title="Copy code">
-                    {copied ? <Check size={13} color="var(--success)" /> : <Copy size={13} />}
-                    <span>{copied ? "Copied" : "Copy"}</span>
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => navigate(`/impact`)}
-                    title="Analyze impact of this file"
-                  >
-                    <GitFork size={13} />
-                    <span>Blast Radius</span>
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ flex: 1, overflowY: "auto", padding: "16px", backgroundColor: "#FFFFFF" }}>
-                <pre style={{ margin: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", lineHeight: "1.6", color: "#1F2937" }}>
-                  <code>{selectedResult.content}</code>
-                </pre>
-              </div>
-            </>
+            <SourceViewer
+              repositoryName={activeRepo.name}
+              filePath={selectedResult.file_path}
+              targetLine={selectedResult.line_number || selectedResult.start_line}
+            />
           ) : (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", flexDirection: "column", gap: "10px" }}>
-              <Code2 size={44} color="var(--border-hover)" />
-              <span style={{ fontSize: "14px", fontWeight: 500 }}>Select a search match on the left to preview source code and citations.</span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", flexDirection: "column", gap: "8px" }}>
+              <FileText size={32} style={{ opacity: 0.4 }} />
+              <span style={{ fontSize: "13px" }}>Select a search result on the left to inspect its code</span>
             </div>
           )}
         </div>

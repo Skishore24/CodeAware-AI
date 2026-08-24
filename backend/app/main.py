@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.auth import router as auth_router
 from app.api.github import router as github_router
 from app.api.repositories import router as repositories_router
 from app.api.ingestion import router as ingestion_router
@@ -14,6 +15,15 @@ from app.api.review import router as review_router
 from app.api.architecture import router as architecture_router
 from app.api.tests import router as tests_router
 from app.api.system import router as system_router
+from app.db.database import init_db_engine, Base
+
+# Initialize Database and Tables
+try:
+    db_engine = init_db_engine()
+    if db_engine is not None:
+        Base.metadata.create_all(bind=db_engine)
+except Exception as e:
+    print(f"Warning: Database initialization exception: {e}")
 
 
 # =========================================================
@@ -59,6 +69,7 @@ app.add_middleware(
 # ROUTERS
 # =========================================================
 
+app.include_router(auth_router)
 app.include_router(github_router)
 app.include_router(repositories_router)
 app.include_router(ingestion_router)

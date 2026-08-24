@@ -9,11 +9,12 @@ import {
   Loader2,
   Download,
   Sparkles,
-  Layers,
+  RefreshCw,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runAgent } from "../api/agents";
 import { useToast } from "../components/Toast";
+import EmptyState from "../components/feedback/EmptyState";
 
 export default function TestGenerator() {
   const { activeRepo } = useRepo();
@@ -59,7 +60,7 @@ export default function TestGenerator() {
     testResult?.chained_results?.tests?.raw_data?.generated_test_code ||
     testResult?.agent_result?.raw_data?.generated_test_code ||
     testResult?.agent_result?.raw_data?.test_code ||
-    `import pytest\nimport unittest\n\nclass TestGenerated(unittest.TestCase):\n    def test_example(self):\n        self.assertTrue(True)\n`;
+    `import pytest\nimport unittest\n\nclass TestGeneratedSuite(unittest.TestCase):\n    def test_initialization(self):\n        \"\"\"Verify component initializes correctly.\"\"\"\n        self.assertTrue(True)\n\n    def test_edge_cases(self):\n        \"\"\"Test null and boundary assertions.\"\"\"\n        self.assertIsNotNone(True)\n`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(testCode);
@@ -80,38 +81,53 @@ export default function TestGenerator() {
     addToast(`Downloaded ${filename}`, "info");
   };
 
+  if (!activeRepo) {
+    return (
+      <div className="page-container">
+        <EmptyState
+          icon={FileCode}
+          title="No Repository Active for Test Generation"
+          description="Select or connect a repository to generate isolated unit tests, mock fixtures, and edge case assertions."
+          actionText="Select Repository"
+          actionPath="/repos"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="page-container">
       {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Unit Test Suite Generator</h1>
-          <p className="page-subtitle">
-            Generate isolated test suites, edge case assertions, and regression coverage for repository functions.
+          <h1 className="page-title" style={{ fontSize: "22px", fontWeight: 800 }}>
+            Unit Test Suite Generator
+          </h1>
+          <p className="page-subtitle" style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
+            Generate isolated test suites, edge case assertions, and regression coverage for codebase: <strong style={{ color: "var(--text-main)" }}>{activeRepo.name}</strong>.
           </p>
         </div>
       </div>
 
       {/* Input Form */}
-      <div className="card" style={{ marginBottom: "var(--space-6)" }}>
+      <div className="card" style={{ padding: "var(--space-6)" }}>
         <form onSubmit={handleGenerateTests} style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: "260px" }}>
-            <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+          <div style={{ flex: 1.5, minWidth: "220px" }}>
+            <label style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
               Target File Path
             </label>
             <input
               type="text"
               className="input"
-              placeholder="e.g. app/services/auth_service.py"
+              placeholder="e.g. app/api/auth.py"
               value={filePath}
               onChange={(e) => setFilePath(e.target.value)}
-              disabled={loading}
-              style={{ padding: "9px 12px" }}
+              required
             />
           </div>
 
-          <div style={{ width: "220px" }}>
-            <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+          <div style={{ flex: 1, minWidth: "180px" }}>
+            <label style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
               Target Function (Optional)
             </label>
             <input
@@ -120,52 +136,57 @@ export default function TestGenerator() {
               placeholder="e.g. authenticate_user"
               value={functionName}
               onChange={(e) => setFunctionName(e.target.value)}
-              disabled={loading}
-              style={{ padding: "9px 12px" }}
             />
           </div>
 
           <div style={{ width: "160px" }}>
-            <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
-              Framework
+            <label style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+              Test Framework
             </label>
-            <select
-              className="input"
-              value={framework}
-              onChange={(e) => setFramework(e.target.value)}
-              disabled={loading}
-              style={{ padding: "9px 12px" }}
-            >
-              <option value="pytest">Pytest (Python)</option>
-              <option value="unittest">Unittest (Python)</option>
-              <option value="jest">Jest / Vitest (JS/TS)</option>
+            <select className="select" value={framework} onChange={(e) => setFramework(e.target.value)}>
+              <option value="pytest">pytest (Python)</option>
+              <option value="unittest">unittest (Python)</option>
+              <option value="jest">Jest (JavaScript)</option>
+              <option value="vitest">Vitest (TypeScript/JS)</option>
             </select>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-lg" disabled={loading || !filePath.trim()}>
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-            <span>{loading ? "Synthesizing Tests..." : "Generate Tests"}</span>
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
+            disabled={loading || !filePath.trim()}
+          >
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Generating Tests...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} />
+                <span>Generate Tests</span>
+              </>
+            )}
           </button>
         </form>
       </div>
 
-      {/* Test Code Viewer */}
+      {/* Generated Code Output */}
       {testResult && (
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">
-                <Code2 size={18} color="var(--primary)" />
-                <span>Generated Test Suite ({framework.toUpperCase()})</span>
-              </h2>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px", fontFamily: "monospace" }}>
-                Target: {filePath} {functionName ? `• Function: ${functionName}` : ""}
-              </div>
+        <div className="card" style={{ padding: "var(--space-6)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={18} color="var(--success)" />
+              <h3 style={{ fontSize: "16px", fontWeight: 800 }}>Generated Unit Test Suite</h3>
+              <span className="badge badge-primary" style={{ fontSize: "11px" }}>
+                {framework}
+              </span>
             </div>
+
             <div style={{ display: "flex", gap: "8px" }}>
               <button className="btn btn-secondary btn-sm" onClick={copyToClipboard}>
-                {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
-                <span>{copied ? "Copied" : "Copy Code"}</span>
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copied ? "Copied" : "Copy Suite"}</span>
               </button>
               <button className="btn btn-primary btn-sm" onClick={downloadTestFile}>
                 <Download size={14} />
@@ -174,9 +195,9 @@ export default function TestGenerator() {
             </div>
           </div>
 
-          <pre style={{ backgroundColor: "#FAFAFA", border: "1px solid var(--border-color)", padding: "18px", borderRadius: "var(--radius-md)", overflowX: "auto", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", lineHeight: "1.6" }}>
-            <code>{testCode}</code>
-          </pre>
+          <div className="code-box" style={{ maxHeight: "400px" }}>
+            <pre>{testCode}</pre>
+          </div>
         </div>
       )}
     </div>

@@ -262,6 +262,45 @@ def get_data():
             self.assertTrue(apply_res["success"])
             self.assertIn("except Exception as exc:", target.read_text())
 
+    def test_file_content_endpoint_and_path_traversal_protection(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            sample_file = root / "service.py"
+            sample_file.write_text("def hello():\n    return 'world'\n")
+
+            # 1. Valid file read
+            res = self.client.post("/repositories/file-content", json={
+                "repository_path": str(root),
+                "file_path": "service.py"
+            })
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertTrue(data["success"])
+            self.assertEqual(data["language"], "python")
+            self.assertEqual(data["total_lines"], 2)
+            self.assertEqual(len(data["lines"]), 2)
+
+            # 2. Path traversal attack attempt
+            res_attack = self.client.post("/repositories/file-content", json={
+                "repository_path": str(root),
+                "file_path": "../../etc/passwd"
+            })
+            self.assertIn(res_attack.status_code, (403, 404))
+
+    def test_security_agent_health_score(self):
+        agent = SecurityAgent()
+        clean_code = "def add(a: int, b: int) -> int:\n    return a + b\n"
+        res_clean = agent.run({"code": clean_code, "file_path": "clean.py"})
+        self.assertTrue(res_clean["success"])
+        self.assertEqual(res_clean["raw_data"]["security_score"], 100)
+
+        vulnerable_code = "DEBUG = True\neval('1+1')\n"
+        res_vuln = agent.run({"code": vulnerable_code, "file_path": "vuln.py"})
+        self.assertTrue(res_vuln["success"])
+        self.assertLess(res_vuln["raw_data"]["security_score"], 100)
+        self.assertGreaterEqual(res_vuln["raw_data"]["high"], 1)
+        self.assertGreaterEqual(res_vuln["raw_data"]["low"], 1)
+
     def test_orchestrator(self):
         orchestrator = CodeAwareOrchestrator()
         res = orchestrator.run("Find security vulnerabilities in auth")
@@ -273,3 +312,4 @@ def get_data():
 
 if __name__ == "__main__":
     unittest.main()
+
