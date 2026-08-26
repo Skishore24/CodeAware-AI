@@ -1,0 +1,11 @@
+{
+  "name": "codeaware-ai",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm run --prefix frontend dev",
+    "build": "npm run --prefix frontend build",
+    "lint": "npm run --prefix frontend lint",
+    "preview": "npm run --prefix frontend preview"
+  }
+}
