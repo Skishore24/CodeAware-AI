@@ -1,23 +1,16 @@
 import { useState } from "react";
 import {
   FolderGit2,
-  GitBranch,
   Search,
   CheckCircle2,
   RefreshCw,
   Plus,
   Loader2,
-  ExternalLink,
-  Code2,
-  FileCode2,
-  Sparkles,
-  Layers,
   ArrowRight,
   ShieldCheck,
   GitGraph,
   Trash2,
   AlertTriangle,
-  X,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { cloneAndIngest, deleteRepository } from "../api/repositories";

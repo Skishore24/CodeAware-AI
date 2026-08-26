@@ -12,15 +12,12 @@ import {
   Sparkles,
   CheckCircle2,
   KeyRound,
-  FolderGit2,
   Search,
+  Loader2,
   GitGraph,
-  Bot,
-  Zap,
-  Code2,
   ShieldAlert,
   Wrench,
-  Loader2,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
@@ -32,11 +29,11 @@ export default function Login() {
 
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("alex.morgan@codeaware.ai");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [role, setRole] = useState("Lead Engineer");
+  const [role, setRole] = useState("Developer");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -48,7 +45,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      addToast("Please fill in your email and password.", "warning");
+      addToast("Please enter your email and password.", "warning");
       return;
     }
 
@@ -88,25 +85,48 @@ export default function Login() {
     try {
       const res = await login("alex.morgan@codeaware.ai", "demo12345");
       if (res.success) {
-        addToast("Signed in as Demo Lead Engineer.", "success");
+        addToast("Signed in to Demo Workspace.", "success");
         navigate("/", { replace: true });
       } else {
-        addToast(res.error || "Demo login failed.", "error");
+        addToast(res.error || "Demo access failed.", "error");
       }
     } catch (err) {
-      addToast(err.message || "Demo login failed.", "error");
+      addToast(err.message || "Demo access failed.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const features = [
+    {
+      icon: Search,
+      title: "Natural Language Code Search",
+      desc: "Instantly find functions, classes, and routes across repositories in plain English.",
+    },
+    {
+      icon: GitGraph,
+      title: "Interactive Knowledge Graph",
+      desc: "Visualize caller graphs, module dependencies, and cross-file architecture.",
+    },
+    {
+      icon: ShieldAlert,
+      title: "Security & Vulnerability Audit",
+      desc: "Detect OWASP flaws, hardcoded secrets, and unsafe execution paths.",
+    },
+    {
+      icon: Wrench,
+      title: "Autonomous Patching & Fixes",
+      desc: "Synthesize validated code patches with side-by-side diff reviews.",
+    },
+  ];
+
   return (
     <div className="login-page-wrapper">
-      {/* Left Feature Showcase Banner */}
+      {/* Left Product Feature Showcase */}
       <div className="login-showcase-panel">
         <div className="login-showcase-content">
           {/* Logo */}
-          <div className="brand-logo" style={{ color: "white", marginBottom: "36px" }}>
+          <div className="brand-logo" style={{ color: "white", marginBottom: "32px" }}>
             <div className="brand-icon" style={{ boxShadow: "0 0 20px rgba(99, 102, 241, 0.6)" }}>
               <Layers size={18} />
             </div>
@@ -116,66 +136,59 @@ export default function Login() {
           {/* Value Prop Headline */}
           <div className="hero-tag" style={{ background: "rgba(99, 102, 241, 0.2)", color: "#C7D2FE", borderColor: "rgba(99, 102, 241, 0.4)" }}>
             <Sparkles size={13} />
-            <span>Autonomous Code Intelligence</span>
+            <span>AI-Powered Code Intelligence</span>
           </div>
 
-          <h2 style={{ fontSize: "32px", fontWeight: 800, color: "#FFFFFF", lineHeight: "1.2", marginBottom: "16px", letterSpacing: "-0.03em" }}>
-            Understand, search, secure, and fix any codebase with AI.
+          <h2 style={{ fontSize: "30px", fontWeight: 800, color: "#FFFFFF", lineHeight: "1.25", marginBottom: "14px", letterSpacing: "-0.03em" }}>
+            Understand, explore, and improve your entire codebase.
           </h2>
 
-          <p style={{ fontSize: "15px", color: "#94A3B8", lineHeight: "1.6", marginBottom: "32px" }}>
-            Deterministic AST symbol indexing, hybrid semantic search, blast-radius impact analysis, and safe automated patches in one unified workspace.
+          <p style={{ fontSize: "14.5px", color: "#94A3B8", lineHeight: "1.6", marginBottom: "28px" }}>
+            The unified workspace for developers to search symbols, trace architectural dependencies, detect vulnerabilities, and automate code improvements.
           </p>
 
-          {/* Floating Code Intelligence Card Showcase */}
-          <div className="login-code-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "8px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#EF4444" }}></span>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#F59E0B" }}></span>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#10B981" }}></span>
-                <span style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "JetBrains Mono", marginLeft: "6px" }}>
-                  app/api/auth.py
-                </span>
-              </div>
-              <span className="badge badge-success" style={{ fontSize: "10.5px", padding: "2px 6px" }}>
-                AST Verified
-              </span>
-            </div>
-
-            <div style={{ fontFamily: "JetBrains Mono", fontSize: "12px", color: "#E2E8F0", lineHeight: "1.6" }}>
-              <div><span style={{ color: "#818CF8" }}>async def</span> <span style={{ color: "#38BDF8" }}>authenticate_user</span>(token: str):</div>
-              <div style={{ paddingLeft: "16px", color: "#94A3B8" }}># Traces 4 direct callers & 2 routes</div>
-              <div style={{ paddingLeft: "16px" }}><span style={{ color: "#F472B6" }}>return</span> await SecurityAgent.verify(token)</div>
-            </div>
-
-            <div style={{ display: "flex", gap: "8px", marginTop: "14px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <span className="badge badge-primary" style={{ fontSize: "11px" }}>
-                <Search size={11} /> 0ms Symbol Lookup
-              </span>
-              <span className="badge badge-success" style={{ fontSize: "11px" }}>
-                <ShieldCheck size={11} /> OWASP Audited
-              </span>
-            </div>
+          {/* Feature Showcase Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "28px" }}>
+            {features.map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "var(--radius-lg)",
+                    padding: "14px",
+                    backdropFilter: "blur(10px)",
+                  }}
+                >
+                  <div style={{ width: "28px", height: "28px", borderRadius: "var(--radius-md)", backgroundColor: "rgba(99, 102, 241, 0.2)", color: "#818CF8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "8px" }}>
+                    <Icon size={15} />
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#FFFFFF", marginBottom: "2px" }}>
+                    {f.title}
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "#94A3B8", lineHeight: "1.4" }}>
+                    {f.desc}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Feature Bullets */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "28px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#CBD5E1", fontSize: "13px" }}>
-              <CheckCircle2 size={16} color="#10B981" />
-              <span>Multi-Agent Orchestrator</span>
+          {/* Security & Reliability Badges */}
+          <div style={{ display: "flex", gap: "16px", alignItems: "center", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#CBD5E1", fontSize: "12px" }}>
+              <CheckCircle2 size={14} color="#10B981" />
+              <span>Multi-Agent Engine</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#CBD5E1", fontSize: "13px" }}>
-              <CheckCircle2 size={16} color="#10B981" />
-              <span>Blast Radius Impact Tree</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#CBD5E1", fontSize: "12px" }}>
+              <CheckCircle2 size={14} color="#10B981" />
+              <span>Enterprise Grade Security</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#CBD5E1", fontSize: "13px" }}>
-              <CheckCircle2 size={16} color="#10B981" />
-              <span>Safe Unified Diff Patches</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#CBD5E1", fontSize: "13px" }}>
-              <CheckCircle2 size={16} color="#10B981" />
-              <span>Enterprise 256-Bit SSL</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#CBD5E1", fontSize: "12px" }}>
+              <Zap size={14} color="#F59E0B" />
+              <span>Instant AST Parsing</span>
             </div>
           </div>
         </div>
@@ -184,14 +197,14 @@ export default function Login() {
       {/* Right Login / Sign Up Form Panel */}
       <div className="login-form-panel">
         <div className="login-form-container">
-          <div style={{ marginBottom: "28px" }}>
+          <div style={{ marginBottom: "24px" }}>
             <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.02em" }}>
-              {isRegister ? "Create your Developer Account" : "Sign in to CodeAware AI"}
+              {isRegister ? "Create your Account" : "Sign in to CodeAware AI"}
             </h1>
             <p style={{ fontSize: "13.5px", color: "var(--text-secondary)", marginTop: "4px" }}>
               {isRegister
-                ? "Get started with autonomous codebase intelligence and code review."
-                : "Enter your credentials to access your workspaces and repositories."}
+                ? "Get started with code intelligence and automated reviews."
+                : "Enter your credentials to access your repositories and workspace."}
             </p>
           </div>
 
@@ -220,7 +233,7 @@ export default function Login() {
                   Quick Demo Access (1-Click)
                 </div>
                 <div style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-                  Instant login as Lead Engineer with sample repositories
+                  Instant sign in with sample codebases & demo projects
                 </div>
               </div>
             </div>
@@ -237,7 +250,7 @@ export default function Login() {
                   <input
                     type="text"
                     className="input"
-                    placeholder="Alex Morgan"
+                    placeholder="e.g. Sarah Chen"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     style={{ paddingLeft: "36px", height: "42px" }}
@@ -251,13 +264,13 @@ export default function Login() {
 
             <div>
               <label style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
-                Work Email
+                Email Address
               </label>
               <div style={{ position: "relative" }}>
                 <input
                   type="email"
                   className="input"
-                  placeholder="alex.morgan@codeaware.ai"
+                  placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   style={{ paddingLeft: "36px", height: "42px" }}
@@ -278,7 +291,7 @@ export default function Login() {
                     href="#forgot"
                     onClick={(e) => {
                       e.preventDefault();
-                      addToast("Reset instructions sent to your email.", "info");
+                      addToast("Password reset instructions sent to your email.", "info");
                     }}
                     style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 600 }}
                   >
@@ -319,13 +332,14 @@ export default function Login() {
             {isRegister && (
               <div>
                 <label style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
-                  Engineering Role
+                  Role
                 </label>
                 <select className="select" value={role} onChange={(e) => setRole(e.target.value)} style={{ height: "42px" }} disabled={loading}>
                   <option value="Lead Engineer">Lead Engineer / Architect</option>
                   <option value="Senior Developer">Senior Full Stack Developer</option>
                   <option value="Security Analyst">Security Analyst</option>
                   <option value="DevOps Specialist">DevOps & Infrastructure</option>
+                  <option value="Developer">Developer</option>
                 </select>
               </div>
             )}
@@ -339,11 +353,11 @@ export default function Login() {
                   style={{ accentColor: "var(--primary)" }}
                   disabled={loading}
                 />
-                <span>Remember this workstation</span>
+                <span>Remember this device</span>
               </label>
 
               <span className="badge badge-success" style={{ fontSize: "11px", padding: "2px 8px" }}>
-                <ShieldCheck size={12} /> 256-Bit SSL
+                <ShieldCheck size={12} /> Secure Login
               </span>
             </div>
 
@@ -351,7 +365,7 @@ export default function Login() {
               {loading ? (
                 <>
                   <Loader2 size={16} className="spin" />
-                  <span>Verifying Credentials...</span>
+                  <span>Signing In...</span>
                 </>
               ) : (
                 <>

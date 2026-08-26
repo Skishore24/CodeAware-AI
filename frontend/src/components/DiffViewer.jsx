@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Check, FileDiff, CheckCircle2, XCircle, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Copy, Check, FileDiff, CheckCircle2, XCircle } from "lucide-react";
 
 /**
  * Professional Diff Viewer for CodeAware AI Autonomous Fix and Code Review.

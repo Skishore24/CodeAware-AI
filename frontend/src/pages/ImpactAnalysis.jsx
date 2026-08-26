@@ -2,17 +2,12 @@ import { useState } from "react";
 import {
   GitFork,
   Search,
-  ShieldAlert,
   FileCode,
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
   Loader2,
-  Layers,
-  Activity,
   AlertOctagon,
-  Sparkles,
-  GitBranch,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { getImpact } from "../api/graph";
@@ -66,6 +61,13 @@ export default function ImpactAnalysis() {
     }
   };
 
+  // Safely extract a display name from a caller object or raw string
+  const getCallerName = (caller) => {
+    if (!caller) return "Unknown";
+    if (typeof caller === "string") return caller;
+    return caller.name || caller.id || caller.path || JSON.stringify(caller);
+  };
+
   if (!activeRepo) {
     return (
       <div className="page-container">
@@ -82,7 +84,8 @@ export default function ImpactAnalysis() {
 
   const directCallers = impactResult?.direct_callers || [];
   const indirectCallers = impactResult?.indirect_callers || [];
-  const affectedFiles = impactResult?.affected_files || [];
+  // Backend may return either key; support both
+  const affectedFiles = impactResult?.dependent_files || impactResult?.affected_files || [];
   const riskScore = impactResult?.risk_level || (directCallers.length > 3 ? "HIGH" : directCallers.length > 0 ? "MEDIUM" : "LOW");
 
   return (
@@ -190,7 +193,10 @@ export default function ImpactAnalysis() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {directCallers.map((c, i) => (
                     <div key={i} className="badge badge-neutral" style={{ padding: "6px 8px", fontSize: "12px", justifyContent: "flex-start" }}>
-                      • {c}
+                      <ArrowRight size={11} style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {getCallerName(c)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -207,8 +213,11 @@ export default function ImpactAnalysis() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {affectedFiles.map((f, i) => (
-                    <div key={i} style={{ fontSize: "12px", fontFamily: "JetBrains Mono", color: "var(--text-main)", padding: "4px 6px", backgroundColor: "var(--bg-subtle)", borderRadius: "var(--radius-sm)" }}>
-                      {f}
+                    <div key={i} style={{ fontSize: "12px", fontFamily: "JetBrains Mono", color: "var(--text-main)", padding: "4px 6px", backgroundColor: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
+                      <FileCode size={12} style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {typeof f === "string" ? f : (f.path || f.name || JSON.stringify(f))}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -229,6 +238,12 @@ export default function ImpactAnalysis() {
                   <CheckCircle2 size={14} color="var(--success)" style={{ flexShrink: 0, marginTop: "2px" }} />
                   <span>Run unit test generator to create regression assertions before committing.</span>
                 </div>
+                {indirectCallers.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                    <AlertTriangle size={14} color="var(--warning)" style={{ flexShrink: 0, marginTop: "2px" }} />
+                    <span>{indirectCallers.length} indirect callers may also be affected transitively.</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

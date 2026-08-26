@@ -1,4 +1,4 @@
-import { GitFork, Layers, Bot, Wrench, Search, ShieldCheck } from "lucide-react";
+import { GitFork, Layers, Bot, Wrench } from "lucide-react";
 
 export default function PipelineSteps() {
   const steps = [

@@ -1,20 +1,10 @@
 import { useState, useEffect } from "react";
 import {
   CheckCircle2,
-  ShieldAlert,
-  Zap,
-  Layers,
-  Bug,
-  AlertTriangle,
-  Play,
-  Check,
   RefreshCw,
   Loader2,
-  Award,
   Sparkles,
   ShieldCheck,
-  ArrowRight,
-  Sliders,
   Wrench,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";

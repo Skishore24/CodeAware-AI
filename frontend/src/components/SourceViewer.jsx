@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Copy, Check, FileCode, ExternalLink, Code2, Layers, AlertCircle } from "lucide-react";
+import { Copy, Check, FileCode, AlertCircle } from "lucide-react";
 import client from "../api/client";
 
 /**

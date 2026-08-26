@@ -2,31 +2,19 @@ import { useState, useEffect } from "react";
 import {
   Search,
   FileCode,
-  SlidersHorizontal,
-  ChevronRight,
-  ExternalLink,
   Code2,
-  Sparkles,
   Loader2,
-  Copy,
-  Check,
-  Filter,
-  Terminal,
-  Layers,
-  GitFork,
-  Bot,
   FileText,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { searchCode } from "../api/rag";
 import { useToast } from "../components/Toast";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import SourceViewer from "../components/SourceViewer";
 import EmptyState from "../components/feedback/EmptyState";
 import { SearchResultSkeleton } from "../components/feedback/Skeleton";
 
 export default function CodeSearch() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { activeRepo } = useRepo();
   const { addToast } = useToast();
@@ -36,9 +24,6 @@ export default function CodeSearch() {
   const [results, setResults] = useState([]);
   const [selectedResult, setSelectedResult] = useState(null);
 
-  // Filters
-  const [languageFilter, setLanguageFilter] = useState("");
-  const [filePathFilter, setFilePathFilter] = useState("");
 
   const searchPresets = [
     "Where is authentication implemented?",
@@ -59,11 +44,7 @@ export default function CodeSearch() {
 
     setSearching(true);
     try {
-      const filters = {};
-      if (languageFilter) filters.language = languageFilter;
-      if (filePathFilter) filters.file_path = filePathFilter;
-
-      const data = await searchCode(activeRepo.name, q, filters);
+      const data = await searchCode(activeRepo.name, q, {});
       const items = data?.results || [];
       setResults(items);
       setSelectedResult(items[0] || null);
@@ -84,7 +65,15 @@ export default function CodeSearch() {
       setQuery(initialQ);
       handleSearch(initialQ);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRepo, searchParams]);
+
+  // Normalize result fields: backend returns { file, symbol, start_line, end_line, score, content }
+  const getResultFile = (item) => item.file || item.file_path || "";
+  const getResultSymbol = (item) => item.symbol || item.symbol_name || item.name || "";
+  const getResultType = (item) => item.symbol_type || item.type || "code";
+  const getResultSnippet = (item) => item.content || item.snippet || item.raw_code || "";
+  const getResultLine = (item) => item.start_line || item.line_number || item.line || null;
 
   if (!activeRepo) {
     return (
@@ -217,6 +206,12 @@ export default function CodeSearch() {
             ) : (
               results.map((item, idx) => {
                 const isSelected = selectedResult === item;
+                const filePath = getResultFile(item);
+                const symbolName = getResultSymbol(item);
+                const symbolType = getResultType(item);
+                const snippet = getResultSnippet(item);
+                const lineNum = getResultLine(item);
+
                 return (
                   <div
                     key={idx}
@@ -233,19 +228,19 @@ export default function CodeSearch() {
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <Code2 size={14} color="var(--primary)" />
                         <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--text-main)" }}>
-                          {item.symbol_name || item.name || (item.file_path ? item.file_path.split("/").pop() : "Symbol")}
+                          {symbolName || (filePath ? filePath.split("/").pop() : "Symbol")}
                         </span>
                       </div>
                       <span className="badge badge-neutral" style={{ fontSize: "10.5px" }}>
-                        {item.symbol_type || item.type || "code"}
+                        {symbolType}
                       </span>
                     </div>
 
                     <div style={{ fontSize: "11.5px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", wordBreak: "break-all" }}>
-                      {item.file_path} {item.line_number ? `:${item.line_number}` : ""}
+                      {filePath}{lineNum ? `:${lineNum}` : ""}
                     </div>
 
-                    {item.snippet && (
+                    {snippet && (
                       <div
                         style={{
                           marginTop: "6px",
@@ -260,7 +255,7 @@ export default function CodeSearch() {
                           whiteSpace: "pre-wrap",
                         }}
                       >
-                        {item.snippet}
+                        {snippet.slice(0, 200)}
                       </div>
                     )}
                   </div>
@@ -275,8 +270,13 @@ export default function CodeSearch() {
           {selectedResult ? (
             <SourceViewer
               repositoryName={activeRepo.name}
-              filePath={selectedResult.file_path}
-              targetLine={selectedResult.line_number || selectedResult.start_line}
+              filePath={getResultFile(selectedResult)}
+              startLine={getResultLine(selectedResult) || 1}
+              highlightLines={
+                getResultLine(selectedResult)
+                  ? [getResultLine(selectedResult), (selectedResult.end_line || getResultLine(selectedResult)) + 5]
+                  : []
+              }
             />
           ) : (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", flexDirection: "column", gap: "8px" }}>

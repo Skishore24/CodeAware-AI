@@ -16,7 +16,7 @@ import { useRepo } from "../context/RepoContext";
 
 export default function CommandPalette({ isOpen, onClose }) {
   const navigate = useNavigate();
-  const { repositories, setActiveRepo, activeRepo } = useRepo();
+  const { repositories, setActiveRepo } = useRepo();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
 

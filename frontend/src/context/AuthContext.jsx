@@ -175,7 +175,7 @@ export function AuthProvider({ children }) {
         return res.member;
       }
     } catch (err) {
-      throw err;
+      console.error("addTeamMember failed:", err);
     }
   };
 
@@ -183,7 +183,7 @@ export function AuthProvider({ children }) {
     try {
       await removeTeamMemberApi(id);
       setTeamMembers((prev) => prev.filter((m) => m.id !== id));
-    } catch (err) {
+    } catch {
       setTeamMembers((prev) => prev.filter((m) => m.id !== id));
     }
   };

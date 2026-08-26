@@ -3,32 +3,26 @@ import { useNavigate } from "react-router-dom";
 import {
   FolderGit2,
   FileCode2,
-  Boxes,
   ShieldCheck,
   Search,
   Bot,
   Wrench,
-  Activity,
   CheckCircle2,
   ArrowRight,
   Sparkles,
   GitGraph,
   GitFork,
   ShieldAlert,
-  ArrowUpRight,
-  Layers,
-  Zap,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { scanRepository } from "../api/repositories";
 import { runSecurityScan } from "../api/security";
 import HeroIllustration from "../components/visual/HeroIllustration";
 import PipelineSteps from "../components/visual/PipelineSteps";
-import Tooltip from "../components/common/Tooltip";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { activeRepo, backendStatus, repositories } = useRepo();
+  const { activeRepo } = useRepo();
   const [stats, setStats] = useState({
     files: 0,
     functions: 0,
@@ -150,18 +144,6 @@ export default function Dashboard() {
       path: "/autonomous",
     },
   ];
-
-  const languageColors = {
-    Python: "#3B82F6",
-    JavaScript: "#F59E0B",
-    TypeScript: "#3178C6",
-    Go: "#00ADD8",
-    Java: "#EA580C",
-    "C++": "#EC4899",
-    Rust: "#DEA584",
-    HTML: "#E34F26",
-    CSS: "#563D7C",
-  };
 
   return (
     <div className="page-container">

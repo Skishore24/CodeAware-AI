@@ -1,4 +1,4 @@
-import { FolderGit2, Search, AlertCircle, ArrowRight } from "lucide-react";
+import { FolderGit2, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function EmptyState({

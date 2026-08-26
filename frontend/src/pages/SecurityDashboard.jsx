@@ -6,10 +6,6 @@ import {
   AlertOctagon,
   RefreshCw,
   Loader2,
-  FileCode,
-  CheckCircle2,
-  ArrowRight,
-  Filter,
   Search,
   Wrench,
 } from "lucide-react";

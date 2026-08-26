@@ -1,15 +1,12 @@
 import { useState } from "react";
 import {
   FileCode,
-  Play,
   Copy,
   Check,
   CheckCircle2,
-  Code2,
   Loader2,
   Download,
   Sparkles,
-  RefreshCw,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runAgent } from "../api/agents";
@@ -60,7 +57,7 @@ export default function TestGenerator() {
     testResult?.chained_results?.tests?.raw_data?.generated_test_code ||
     testResult?.agent_result?.raw_data?.generated_test_code ||
     testResult?.agent_result?.raw_data?.test_code ||
-    `import pytest\nimport unittest\n\nclass TestGeneratedSuite(unittest.TestCase):\n    def test_initialization(self):\n        \"\"\"Verify component initializes correctly.\"\"\"\n        self.assertTrue(True)\n\n    def test_edge_cases(self):\n        \"\"\"Test null and boundary assertions.\"\"\"\n        self.assertIsNotNone(True)\n`;
+    `import pytest\nimport unittest\n\nclass TestGeneratedSuite(unittest.TestCase):\n    def test_initialization(self):\n        # Verify component initializes correctly.\n        self.assertTrue(True)\n\n    def test_edge_cases(self):\n        # Test null and boundary assertions.\n        self.assertIsNotNone(True)\n`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(testCode);

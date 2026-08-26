@@ -1,5 +1,5 @@
 # =========================================================
-# CodeAware AI — Git Ignore
+# CodeAware AI — Production Git Ignore
 # =========================================================
 
 # ---------------------------------------------------------
@@ -9,6 +9,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
 .Python
 env/
 venv/
@@ -18,10 +23,6 @@ backend/venv/
 backend/.venv/
 */venv/
 */.venv/
-
-# ---------------------------------------------------------
-# Testing & Coverage
-# ---------------------------------------------------------
 .pytest_cache/
 .coverage
 .coverage.*
@@ -29,6 +30,8 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
+.ruff_cache/
+.mypy_cache/
 
 # ---------------------------------------------------------
 # Environment & Secrets
@@ -39,11 +42,63 @@ coverage.xml
 backend/.env
 backend/.env.*
 !backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+*.pem
+*.key
+*.cert
+
+# ---------------------------------------------------------
+# Node & Frontend Build
+# ---------------------------------------------------------
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist-ssr/
+frontend/dist-ssr/
+.vite/
+frontend/.vite/
+.nx/
+frontend/.nx/
+.eslintcache
+.oxc/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------------------------------------------------------
+# Data Storage, Embeddings & Database
+# ---------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+data/repositories/*
+!data/repositories/.gitkeep
+data/indexes/*
+!data/indexes/.gitkeep
+data/graphs/*
+!data/graphs/.gitkeep
+data/embeddings/*
+!data/embeddings/.gitkeep
+backend/data/*
+!backend/data/.gitkeep
+
+# ---------------------------------------------------------
+# Workspace & Sandboxes
+# ---------------------------------------------------------
+workspace/cloned_repositories/*
+!workspace/cloned_repositories/.gitkeep
+workspace/sandbox/*
+!workspace/sandbox/.gitkeep
+workspace/indexes/*
+!workspace/indexes/.gitkeep
 
 # ---------------------------------------------------------
 # IDE & Editors
 # ---------------------------------------------------------
-.vscode/
+.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -55,45 +110,6 @@ backend/.env.*
 .project
 .pydevproject
 .settings/
-
-# ---------------------------------------------------------
-# Node & Frontend
-# ---------------------------------------------------------
-node_modules/
-frontend/node_modules/
-dist/
-frontend/dist/
-dist-ssr/
-frontend/dist-ssr/
-.vite/
-frontend/.vite/
-.nx/
-frontend/.nx/
-.eslintcache
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# ---------------------------------------------------------
-# Data & Knowledge Storage
-# ---------------------------------------------------------
-data/repositories/*
-!data/repositories/.gitkeep
-data/indexes/*
-!data/indexes/.gitkeep
-data/graphs/*
-!data/graphs/.gitkeep
-data/embeddings/*
-!data/embeddings/.gitkeep
-
-# ---------------------------------------------------------
-# Workspace & Cloned Repositories
-# ---------------------------------------------------------
-workspace/cloned_repositories/*
-!workspace/cloned_repositories/.gitkeep
-workspace/sandbox/*
-!workspace/sandbox/.gitkeep
 
 # ---------------------------------------------------------
 # Operating System & Logs

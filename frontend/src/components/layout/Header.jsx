@@ -7,12 +7,9 @@ import {
   FolderGit2,
   ChevronRight,
   ChevronDown,
-  User,
   LogOut,
-  Shield,
   Users,
   Settings as SettingsIcon,
-  Sparkles,
 } from "lucide-react";
 import { useRepo } from "../../context/RepoContext";
 import { useTheme } from "../../context/ThemeContext";

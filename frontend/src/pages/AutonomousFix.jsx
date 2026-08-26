@@ -2,17 +2,10 @@ import { useState, useEffect } from "react";
 import {
   Wrench,
   FileCode,
-  ShieldCheck,
   CheckCircle2,
-  AlertTriangle,
-  Play,
-  Check,
   Loader2,
-  RotateCcw,
   Sparkles,
-  Layers,
   ArrowRight,
-  ShieldAlert,
   GitCommit,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";

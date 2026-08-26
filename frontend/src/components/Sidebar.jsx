@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Layers,
   Plus,
-  User,
   Check,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
