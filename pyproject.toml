@@ -23,6 +23,3 @@ dependencies = [
 
 [tool.uv]
 package = false
-
-[tool.vercel]
-entrypoint = "backend.app.main:app"
