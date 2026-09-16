@@ -176,7 +176,7 @@ export default function CodeSearch() {
       </div>
 
       {/* Main Results & Source Viewer Split */}
-      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "var(--space-4)" }}>
+      <div className="responsive-split-view" style={{ flex: 1, minHeight: 0 }}>
         {/* Left Column: Results List */}
         <div className="card" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div className="card-header" style={{ padding: "10px 14px" }}>

@@ -190,7 +190,7 @@ export default function SecurityDashboard() {
           </p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "var(--space-4)" }}>
+        <div className="responsive-split-view">
           {/* Findings List */}
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "600px", overflowY: "auto" }}>
             {filteredFindings.map((finding, idx) => {

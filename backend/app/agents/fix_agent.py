@@ -123,6 +123,31 @@ class FixAgent(BaseAgent):
         if suggested_fix:
             return suggested_fix, "Applied user-specified fix modification."
 
+        # Check if Ollama is available to generate an intelligent fix
+        try:
+            from app.services.ollama_service import ollama_service
+            conn = ollama_service.check_connection()
+            if conn.get("connected"):
+                prompt = (
+                    f"Issue to resolve: {problem}\n\n"
+                    f"Original Source Code:\n```\n{original_code[:3500]}\n```\n\n"
+                    "Fix the issue and output the complete corrected code inside a ``` block."
+                )
+                system_inst = "You are an automated code repair agent. Return only the repaired code inside markdown code blocks."
+                llm_patch = ollama_service.generate(prompt=prompt, system=system_inst)
+                if llm_patch and "```" in llm_patch:
+                    parts = llm_patch.split("```")
+                    if len(parts) >= 3:
+                        cleaned = parts[1]
+                        if "\n" in cleaned:
+                            first_line = cleaned.split("\n", 1)[0].strip()
+                            if first_line.lower() in ["python", "javascript", "typescript", "js", "ts", "py"]:
+                                cleaned = cleaned.split("\n", 1)[1]
+                        if cleaned.strip():
+                            return cleaned.strip(), f"Ollama AI ({ollama_service.model}) patch for: {problem}"
+        except Exception:
+            pass
+
         # Fix 1: Bare except -> except Exception as exc:
         if "except" in prob_lower or "bare" in prob_lower:
             new_lines = []

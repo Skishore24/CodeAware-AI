@@ -23,6 +23,7 @@ from app.api.review import router as review_router
 from app.api.architecture import router as architecture_router
 from app.api.tests import router as tests_router
 from app.api.system import router as system_router
+from app.api.ollama import router as ollama_router
 from app.db.database import init_db_engine, Base
 
 # Initialize Database and Tables
@@ -91,6 +92,7 @@ app.include_router(review_router)
 app.include_router(architecture_router)
 app.include_router(tests_router)
 app.include_router(system_router)
+app.include_router(ollama_router)
 
 
 # =========================================================

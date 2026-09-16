@@ -10,13 +10,14 @@ import {
   LogOut,
   Users,
   Settings as SettingsIcon,
+  Menu,
 } from "lucide-react";
 import { useRepo } from "../../context/RepoContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../Toast";
 
-export default function Header({ onOpenPalette }) {
+export default function Header({ onOpenPalette, onToggleMobileSidebar }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { activeRepo } = useRepo();
@@ -77,12 +78,21 @@ export default function Header({ onOpenPalette }) {
 
   return (
     <header className="top-header">
-      {/* Left: Breadcrumbs / Title */}
+      {/* Left: Mobile Menu Toggle & Breadcrumbs / Title */}
       <div className="header-left">
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--text-muted)" }}>
-          <span>{currentMeta.group}</span>
-          <ChevronRight size={13} />
-          <span style={{ fontWeight: 700, color: "var(--text-main)", fontSize: "13.5px" }}>
+        <button
+          className="mobile-menu-toggle header-icon-btn"
+          onClick={onToggleMobileSidebar}
+          title="Toggle Navigation Menu"
+          aria-label="Toggle navigation menu"
+        >
+          <Menu size={18} />
+        </button>
+
+        <div className="header-breadcrumbs">
+          <span className="breadcrumb-group">{currentMeta.group}</span>
+          <ChevronRight size={13} className="breadcrumb-sep" />
+          <span className="breadcrumb-title">
             {currentMeta.title}
           </span>
         </div>
@@ -97,7 +107,8 @@ export default function Header({ onOpenPalette }) {
         >
           <div className="header-search-left">
             <Search size={14} />
-            <span>Search code, switch repos, or run commands...</span>
+            <span className="search-prompt-text">Search code, switch repos, or run commands...</span>
+            <span className="search-prompt-short">Search...</span>
           </div>
           <span className="header-kbd">⌘K</span>
         </button>
@@ -134,7 +145,7 @@ export default function Header({ onOpenPalette }) {
         {isAuthenticated && user ? (
           <div style={{ position: "relative" }} ref={menuRef}>
             <div
-              className="card card-interactive"
+              className="card card-interactive header-user-btn"
               onClick={() => setMenuOpen((prev) => !prev)}
               style={{
                 display: "flex",
@@ -158,14 +169,15 @@ export default function Header({ onOpenPalette }) {
                   justifyContent: "center",
                   fontSize: "12px",
                   fontWeight: 700,
+                  flexShrink: 0,
                 }}
               >
                 {user.name.charAt(0)}
               </div>
-              <span style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-main)", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span className="header-user-name" style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-main)", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user.name}
               </span>
-              <ChevronDown size={13} color="var(--text-subtle)" />
+              <ChevronDown size={13} color="var(--text-subtle)" className="header-user-chevron" />
             </div>
 
             {/* Dropdown Menu */}

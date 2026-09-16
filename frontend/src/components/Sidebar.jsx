@@ -16,12 +16,13 @@ import {
   Layers,
   Plus,
   Check,
+  X,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "./Toast";
 
-export default function Sidebar({ onOpenPalette }) {
+export default function Sidebar({ onOpenPalette, mobileOpen, onCloseMobile }) {
   const navigate = useNavigate();
   const { activeRepo, repositories, setActiveRepo } = useRepo();
   const { user } = useAuth();
@@ -47,19 +48,31 @@ export default function Sidebar({ onOpenPalette }) {
   };
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       {/* Brand Header */}
       <div className="sidebar-header">
-        <div className="brand-logo" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
-          <div className="brand-icon">
-            <Layers size={16} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+          <div className="brand-logo" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+            <div className="brand-icon">
+              <Layers size={16} />
+            </div>
+            <div>
+              <span>CodeAware</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--primary)", marginLeft: "4px" }}>
+                AI
+              </span>
+            </div>
           </div>
-          <div>
-            <span>CodeAware</span>
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--primary)", marginLeft: "4px" }}>
-              AI
-            </span>
-          </div>
+
+          {/* Mobile Close Drawer Button */}
+          <button
+            className="sidebar-close-btn"
+            onClick={onCloseMobile}
+            title="Close Navigation"
+            aria-label="Close navigation"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Repository Switcher Card & Dropdown */}

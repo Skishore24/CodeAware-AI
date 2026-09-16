@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Users,
   Shield,
@@ -17,19 +17,110 @@ import {
   FileCode,
   GitFork,
   Wrench,
+  Cpu,
+  Server,
+  RefreshCw,
+  Loader2,
+  Sparkles,
+  AlertCircle,
+  ExternalLink,
+  Code2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
+import { getOllamaStatus, updateOllamaConfig, testOllamaGenerate } from "../api/ollama";
 
 export default function Settings() {
   const { user, teamMembers, addTeamMember, removeTeamMember, updateProfile } = useAuth();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState("users"); // 'users' | 'profile' | 'security' | 'agents'
+  const [activeTab, setActiveTab] = useState("users"); // 'users' | 'profile' | 'security' | 'agents' | 'ollama'
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("Developer");
   const [copiedKey, setCopiedKey] = useState(false);
+
+  // Ollama local LLM state
+  const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
+  const [ollamaModel, setOllamaModel] = useState("qwen2.5-coder:7b");
+  const [ollamaConnected, setOllamaConnected] = useState(false);
+  const [ollamaVersion, setOllamaVersion] = useState(null);
+  const [installedOllamaModels, setInstalledOllamaModels] = useState([]);
+  const [ollamaRecommendations, setOllamaRecommendations] = useState([]);
+  const [loadingOllama, setLoadingOllama] = useState(false);
+  const [savingOllama, setSavingOllama] = useState(false);
+  const [testPrompt, setTestPrompt] = useState("Write a clean Python function to safely parse a JSON file with try/except error handling.");
+  const [testOutput, setTestOutput] = useState("");
+  const [generatingTest, setGeneratingTest] = useState(false);
+  const [copiedCmd, setCopiedCmd] = useState("");
+
+  const fetchOllama = async () => {
+    setLoadingOllama(true);
+    try {
+      const data = await getOllamaStatus();
+      if (data?.connection) {
+        setOllamaConnected(Boolean(data.connection.connected));
+        setOllamaVersion(data.connection.version || null);
+        if (data.connection.base_url) setOllamaUrl(data.connection.base_url);
+        if (data.connection.model) setOllamaModel(data.connection.model);
+      }
+      setInstalledOllamaModels(data?.installed_models || []);
+      setOllamaRecommendations(data?.recommendations || []);
+    } catch {
+      setOllamaConnected(false);
+    } finally {
+      setLoadingOllama(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOllama();
+  }, []);
+
+  const handleSaveOllama = async (e) => {
+    e.preventDefault();
+    setSavingOllama(true);
+    try {
+      const res = await updateOllamaConfig(ollamaUrl, ollamaModel);
+      if (res?.success) {
+        setOllamaConnected(Boolean(res.connection?.connected));
+        addToast(`Ollama settings updated. Active model: ${res.model}`, "success");
+        await fetchOllama();
+      } else {
+        addToast("Failed to update Ollama configuration.", "error");
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to update Ollama settings.", "error");
+    } finally {
+      setSavingOllama(false);
+    }
+  };
+
+  const handleTestGenerate = async () => {
+    if (!testPrompt.trim()) return;
+    setGeneratingTest(true);
+    setTestOutput("");
+    try {
+      const res = await testOllamaGenerate(testPrompt.trim(), ollamaModel);
+      if (res?.response) {
+        setTestOutput(res.response);
+        addToast(`Response generated using ${res.model || ollamaModel}`, "success");
+      } else {
+        addToast("No response received from Ollama.", "warning");
+      }
+    } catch (err) {
+      addToast(err.message || "Ollama generation failed. Ensure model is installed and running.", "error");
+    } finally {
+      setGeneratingTest(false);
+    }
+  };
+
+  const copyCommand = (cmd) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedCmd(cmd);
+    addToast("Pull command copied to clipboard!", "info");
+    setTimeout(() => setCopiedCmd(""), 2500);
+  };
 
   // Profile form state
   const [userName, setUserName] = useState(user?.name || "Alex Morgan");
@@ -108,6 +199,7 @@ export default function Settings() {
           { id: "profile", label: "My Profile", icon: User },
           { id: "security", label: "Security & API Keys", icon: Shield },
           { id: "agents", label: `AI Agents (${agentsList.length})`, icon: Bot },
+          { id: "ollama", label: `Ollama Local LLM ${ollamaConnected ? "●" : ""}`, icon: Cpu },
         ].map((t) => {
           const Icon = t.icon;
           return (
@@ -426,6 +518,304 @@ export default function Settings() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Ollama Local LLM Integration */}
+      {activeTab === "ollama" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+          {/* Status & Connection Card */}
+          <div className="card" style={{ padding: "var(--space-5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: ollamaConnected ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
+                    color: ollamaConnected ? "var(--success)" : "var(--warning)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Cpu size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span>Ollama Local Reasoning Engine</span>
+                    {ollamaConnected ? (
+                      <span className="badge badge-success" style={{ fontSize: "11px" }}>
+                        <CheckCircle2 size={12} /> Connected {ollamaVersion ? `(v${ollamaVersion})` : ""}
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning" style={{ fontSize: "11px" }}>
+                        <AlertCircle size={12} /> Offline / Not Detected
+                      </span>
+                    )}
+                  </h3>
+                  <p style={{ fontSize: "12.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+                    Run 100% private, local LLMs on your CPU or GPU without sending any code or AST context to external clouds.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={fetchOllama}
+                disabled={loadingOllama}
+                title="Refresh Ollama connection status"
+              >
+                <RefreshCw size={13} className={loadingOllama ? "animate-spin" : ""} />
+                <span>{loadingOllama ? "Checking..." : "Refresh Status"}</span>
+              </button>
+            </div>
+
+            {/* Connection settings form */}
+            <form onSubmit={handleSaveOllama} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", alignItems: "flex-end" }}>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>
+                  Ollama Base URL
+                </label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="http://localhost:11434"
+                    value={ollamaUrl}
+                    onChange={(e) => setOllamaUrl(e.target.value)}
+                    style={{ paddingLeft: "32px", fontSize: "13px" }}
+                  />
+                  <Server size={14} color="var(--text-subtle)" style={{ position: "absolute", left: "10px", top: "11px" }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>
+                  Active Reasoning Model
+                </label>
+                <select
+                  className="input"
+                  value={ollamaModel}
+                  onChange={(e) => setOllamaModel(e.target.value)}
+                  style={{ fontSize: "13px" }}
+                >
+                  <optgroup label="Installed Local Models">
+                    {installedOllamaModels.map((m, idx) => {
+                      const mName = m.name || m.model;
+                      return (
+                        <option key={idx} value={mName}>
+                          {mName} ({m.details?.parameter_size || "local"})
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                  <optgroup label="Recommended for CodeAware">
+                    <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (Best for Code & Bug Fixing)</option>
+                    <option value="qwen2.5-coder:14b">qwen2.5-coder:14b (Advanced Coder)</option>
+                    <option value="deepseek-r1:8b">deepseek-r1:8b (Root-Cause Analysis)</option>
+                    <option value="llama3.1:8b">llama3.1:8b (General Purpose)</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingOllama}
+                  style={{ width: "100%", height: "38px" }}
+                >
+                  {savingOllama ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} />
+                      <span>Save & Apply Model</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Model Recommendations for Bug Fixing & Coding */}
+          <div>
+            <div style={{ marginBottom: "var(--space-3)" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-main)" }}>
+                Which Ollama Model is Best to Fix Problems?
+              </h3>
+              <p style={{ fontSize: "12.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                Curated open-source models ranked for code comprehension, automated bug repair, AST grounding, and patch synthesis.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "14px" }}>
+              {ollamaRecommendations.map((rec) => {
+                const isInstalled = installedOllamaModels.some(
+                  (im) => (im.name || im.model || "").includes(rec.id)
+                );
+                const isActive = ollamaModel === rec.id;
+
+                return (
+                  <div
+                    key={rec.id}
+                    className="card"
+                    style={{
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      borderColor: rec.recommended ? "var(--primary)" : isActive ? "var(--info)" : "var(--border-color)",
+                      boxShadow: rec.recommended ? "0 0 0 1px var(--primary), var(--shadow-sm)" : "var(--shadow-xs)",
+                      backgroundColor: rec.recommended ? "var(--bg-surface)" : "var(--bg-card)",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <h4 style={{ fontSize: "14.5px", fontWeight: 800 }}>{rec.name}</h4>
+                            {rec.recommended && (
+                              <span className="badge badge-primary" style={{ fontSize: "10.5px" }}>
+                                <Sparkles size={11} /> #1 Top Pick
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "11.5px", color: "var(--primary)", fontWeight: 600, marginTop: "2px" }}>
+                            {rec.tagline}
+                          </div>
+                        </div>
+
+                        {isInstalled ? (
+                          <span className="badge badge-success" style={{ fontSize: "11px" }}>
+                            <CheckCircle2 size={12} /> Installed
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: "10.5px" }}>
+                            {rec.ram_required}
+                          </span>
+                        )}
+                      </div>
+
+                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.45", marginBottom: "12px" }}>
+                        {rec.description}
+                      </p>
+
+                      <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginBottom: "14px" }}>
+                        <strong style={{ color: "var(--text-main)" }}>Best for: </strong>
+                        {rec.best_for}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px" }}>
+                      {isInstalled ? (
+                        <button
+                          className={`btn ${isActive ? "btn-primary" : "btn-secondary"} btn-sm`}
+                          style={{ flex: 1 }}
+                          onClick={() => {
+                            setOllamaModel(rec.id);
+                            updateOllamaConfig(ollamaUrl, rec.id);
+                            addToast(`Active model switched to ${rec.name}`, "success");
+                          }}
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>{isActive ? "Active Model" : "Select Model"}</span>
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, fontSize: "12px" }}
+                          onClick={() => copyCommand(rec.pull_cmd)}
+                          title="Copy terminal command to download this model"
+                        >
+                          {copiedCmd === rec.pull_cmd ? (
+                            <>
+                              <Check size={13} color="var(--success)" />
+                              <span>Command Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              <span>Copy: {rec.pull_cmd}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Interactive Test Generation */}
+          <div className="card" style={{ padding: "var(--space-5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div>
+                <h3 style={{ fontSize: "15px", fontWeight: 700 }}>Test Model Reasoning Live</h3>
+                <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Verify that your configured Ollama model responds correctly to coding requests.
+                </p>
+              </div>
+              <span className="badge badge-neutral" style={{ fontFamily: "JetBrains Mono", fontSize: "11px" }}>
+                Target: {ollamaModel}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+              <input
+                type="text"
+                className="input"
+                placeholder="Ask a coding question or describe a bug to fix..."
+                value={testPrompt}
+                onChange={(e) => setTestPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !generatingTest && handleTestGenerate()}
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleTestGenerate}
+                disabled={generatingTest || !testPrompt.trim()}
+              >
+                {generatingTest ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Thinking...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} />
+                    <span>Generate</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {testOutput && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "14px",
+                  backgroundColor: "var(--bg-subtle)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border-color)",
+                  fontFamily: "JetBrains Mono",
+                  fontSize: "12px",
+                  whiteSpace: "pre-wrap",
+                  lineHeight: "1.5",
+                  maxHeight: "350px",
+                  overflowY: "auto",
+                }}
+              >
+                {testOutput}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -31,7 +31,26 @@ class CodeAwareReasoner(AIModel):
 
         question = prompt.strip()
         metadata = metadata or {}
-        
+
+        # 1. Check if local Ollama LLM is available
+        try:
+            from app.services.ollama_service import ollama_service
+            sys_inst = (
+                "You are CodeAware AI, an expert software architecture and code intelligence assistant. "
+                "Analyze the provided repository context and accurately answer the user's question. "
+                "Cite exact source file names and functions whenever relevant."
+            )
+            llm_result = ollama_service.generate(
+                prompt=question,
+                system=sys_inst,
+                context=context[:4000] if context else "",
+            )
+            if llm_result and len(llm_result.strip()) > 20:
+                return llm_result
+        except Exception:
+            pass
+
+        # 2. Deterministic AST & Context Synthesis Fallback
         files = self.extract_files(context)
         symbols = self.extract_symbols(context)
         citations = self.extract_citations(context)

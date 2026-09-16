@@ -33,8 +33,14 @@ function PageWrapper({ children }) {
 
 function MainLayout({ children }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { isAuthenticated, isInitializing } = useAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    // Automatically close mobile sidebar on navigation
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -62,9 +68,22 @@ function MainLayout({ children }) {
 
   return (
     <div className="app-layout">
-      <Sidebar onOpenPalette={() => setPaletteOpen(true)} />
+      {/* Mobile Drawer Backdrop */}
+      <div
+        className={`sidebar-backdrop ${mobileSidebarOpen ? "active" : ""}`}
+        onClick={() => setMobileSidebarOpen(false)}
+        aria-hidden="true"
+      />
+      <Sidebar
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
       <div className="main-wrapper">
-        <Header onOpenPalette={() => setPaletteOpen(true)} />
+        <Header
+          onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)}
+          onOpenPalette={() => setPaletteOpen(true)}
+        />
         <main className="main-content">
           <PageWrapper>{children}</PageWrapper>
         </main>

@@ -8,15 +8,86 @@ from git import Repo
 from git.exc import GitCommandError
 
 
-def _remove_readonly(func, path, exc_info):
-    """
-    Error handler for shutil.rmtree on Windows when removing read-only git files.
-    """
+import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _force_writable(path: str | Path):
     try:
-        os.chmod(path, stat.S_IWRITE | stat.S_IWUSR)
-        func(path)
+        os.chmod(path, stat.S_IWRITE | stat.S_IWUSR | stat.S_IRUSR)
     except Exception:
         pass
+
+
+def robust_rmtree(target_dir: Path | str):
+    """
+    Robust recursive directory deletion on Windows and POSIX.
+    Handles Git pack files, read-only attributes, and Windows permission locks.
+    """
+    p = Path(target_dir).resolve()
+    if not p.exists():
+        return
+
+    # Step 1: Recursively strip Windows read-only attributes
+    for root, dirs, files in os.walk(str(p)):
+        for fname in files:
+            _force_writable(os.path.join(root, fname))
+        for dname in dirs:
+            _force_writable(os.path.join(root, dname))
+    _force_writable(p)
+
+    # Step 2: Try Python shutil.rmtree
+    def _handle_error(func, path, exc_info):
+        _force_writable(path)
+        try:
+            func(path)
+        except Exception:
+            pass
+
+    try:
+        # Python 3.12+ supports onexc parameter
+        try:
+            def on_exc(func, path, exc):
+                _force_writable(path)
+                try:
+                    func(path)
+                except Exception:
+                    pass
+            shutil.rmtree(p, onexc=on_exc)
+        except TypeError:
+            shutil.rmtree(p, onerror=_handle_error)
+    except Exception as e:
+        logger.warning(f"shutil.rmtree raised exception: {e}")
+
+    # Step 3: Windows native fallback cmd /c rmdir /s /q
+    if p.exists() and os.name == "nt":
+        try:
+            subprocess.run(
+                ["cmd", "/c", "rmdir", "/s", "/q", str(p)],
+                capture_output=True,
+                check=False,
+                timeout=15,
+            )
+        except Exception as e:
+            logger.warning(f"cmd rmdir fallback failed: {e}")
+
+    # Step 4: Windows PowerShell fallback
+    if p.exists() and os.name == "nt":
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", f'Remove-Item -LiteralPath "{str(p)}" -Recurse -Force'],
+                capture_output=True,
+                check=False,
+                timeout=15,
+            )
+        except Exception as e:
+            logger.warning(f"powershell Remove-Item fallback failed: {e}")
+
+    if p.exists():
+        raise RuntimeError(f"Could not remove repository directory '{p}'. Files may be locked by another process.")
+
 
 
 class RepositoryService:
@@ -93,7 +164,7 @@ class RepositoryService:
             raise FileNotFoundError(f"Repository '{sanitized_name}' does not exist in workspace.")
 
         try:
-            shutil.rmtree(target_dir, onerror=_remove_readonly)
+            robust_rmtree(target_dir)
         except Exception as exc:
             raise RuntimeError(f"Failed to delete repository directory: {exc}") from exc
 

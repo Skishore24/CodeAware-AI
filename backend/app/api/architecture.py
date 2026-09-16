@@ -19,6 +19,7 @@ class ArchitectureRequest(BaseModel):
 
 
 @router.post("/analyze")
+@router.post("/map")
 def analyze_architecture(request: ArchitectureRequest) -> Dict[str, Any]:
     try:
         return arch_agent.run(request.model_dump())

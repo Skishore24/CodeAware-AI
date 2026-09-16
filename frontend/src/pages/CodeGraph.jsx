@@ -509,13 +509,10 @@ export default function CodeGraph() {
 
       {/* Main Canvas & Inspector Split */}
       <div
+        className={`graph-workspace-grid ${isSectionMaximized ? "maximized" : ""}`}
         style={{
           flex: 1,
           minHeight: 0,
-          display: "grid",
-          gridTemplateColumns: isSectionMaximized ? "1fr" : "1fr 340px",
-          gap: "var(--space-4)",
-          transition: "grid-template-columns 0.2s ease",
         }}
       >
         {/* Left: Interactive Connected Graph Canvas */}
