@@ -198,18 +198,15 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 🧪 Testing & Code Quality
+## 🧪 Verification & Code Quality
 
 ```bash
-# Run backend test suite
-cd backend
-python -m unittest tests.test_codeaware -v
-
 # Run frontend linter (0 warnings)
 cd frontend
 npm run lint
 
 # Run frontend production build
+cd frontend
 npm run build
 ```
 

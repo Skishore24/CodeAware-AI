@@ -70,8 +70,14 @@ class FixAgent(BaseAgent):
                 error="Source code empty or not found."
             )
 
-        # Generate Patch deterministically
-        patched_code, fix_description = self._generate_patch(original_code, problem, suggested_fix)
+        # Generate Patch deterministically or via Ollama LLM
+        use_llm = input_data.get("use_llm", False)
+        patched_code, fix_description = self._generate_patch(
+            original_code=original_code,
+            problem=problem,
+            suggested_fix=suggested_fix,
+            use_llm=use_llm,
+        )
 
         # Generate Unified Diff
         diff_lines = list(difflib.unified_diff(
@@ -115,40 +121,55 @@ class FixAgent(BaseAgent):
             }
         )
 
-    def _generate_patch(self, original_code: str, problem: str, suggested_fix: Optional[str]) -> (str, str):
+    def _generate_patch(
+        self,
+        original_code: str,
+        problem: str,
+        suggested_fix: Optional[str] = None,
+        use_llm: bool = False,
+    ) -> (str, str):
         lines = original_code.splitlines()
         prob_lower = (problem or "").lower()
 
-        # If user explicitly provided a suggested replacement
+        # 1. If user explicitly provided a suggested replacement
         if suggested_fix:
             return suggested_fix, "Applied user-specified fix modification."
 
-        # Check if Ollama is available to generate an intelligent fix
-        try:
-            from app.services.ollama_service import ollama_service
-            conn = ollama_service.check_connection()
-            if conn.get("connected"):
-                prompt = (
-                    f"Issue to resolve: {problem}\n\n"
-                    f"Original Source Code:\n```\n{original_code[:3500]}\n```\n\n"
-                    "Fix the issue and output the complete corrected code inside a ``` block."
-                )
-                system_inst = "You are an automated code repair agent. Return only the repaired code inside markdown code blocks."
-                llm_patch = ollama_service.generate(prompt=prompt, system=system_inst)
-                if llm_patch and "```" in llm_patch:
-                    parts = llm_patch.split("```")
-                    if len(parts) >= 3:
-                        cleaned = parts[1]
-                        if "\n" in cleaned:
-                            first_line = cleaned.split("\n", 1)[0].strip()
-                            if first_line.lower() in ["python", "javascript", "typescript", "js", "ts", "py"]:
-                                cleaned = cleaned.split("\n", 1)[1]
-                        if cleaned.strip():
-                            return cleaned.strip(), f"Ollama AI ({ollama_service.model}) patch for: {problem}"
-        except Exception:
-            pass
+        # Helper function for Ollama LLM generation
+        def _try_ollama_llm():
+            try:
+                from app.services.ollama_service import ollama_service
+                conn = ollama_service.check_connection()
+                if conn.get("connected"):
+                    prompt = (
+                        f"Issue to resolve: {problem}\n\n"
+                        f"Original Source Code:\n```\n{original_code[:3500]}\n```\n\n"
+                        "Fix the issue and output the complete corrected code inside a ``` block."
+                    )
+                    system_inst = "You are an automated code repair agent. Return only the repaired code inside markdown code blocks."
+                    llm_patch = ollama_service.generate(prompt=prompt, system=system_inst)
+                    if llm_patch and "```" in llm_patch:
+                        parts = llm_patch.split("```")
+                        if len(parts) >= 3:
+                            cleaned = parts[1]
+                            if "\n" in cleaned:
+                                first_line = cleaned.split("\n", 1)[0].strip()
+                                if first_line.lower() in ["python", "javascript", "typescript", "js", "ts", "py"]:
+                                    cleaned = cleaned.split("\n", 1)[1]
+                            if cleaned.strip():
+                                return cleaned.strip(), f"Ollama AI ({ollama_service.model}) patch for: {problem}"
+            except Exception:
+                pass
+            return None
 
-        # Fix 1: Bare except -> except Exception as exc:
+        # 2. If explicit LLM generation requested, try Ollama first
+        if use_llm:
+            llm_result = _try_ollama_llm()
+            if llm_result:
+                return llm_result
+
+        # 3. High-confidence deterministic rule fixes for known standard defects
+        # Fix: Bare except -> except Exception as exc:
         if "except" in prob_lower or "bare" in prob_lower:
             new_lines = []
             modified = False
@@ -162,7 +183,7 @@ class FixAgent(BaseAgent):
             if modified:
                 return "\n".join(new_lines), "Replaced bare 'except:' with explicit 'except Exception as exc:'."
 
-        # Fix 2: Unsafe eval() / exec()
+        # Fix: Unsafe eval() / exec()
         if "eval" in prob_lower or "exec" in prob_lower:
             new_lines = []
             modified = False
@@ -177,13 +198,12 @@ class FixAgent(BaseAgent):
             if modified:
                 return "\n".join(new_lines), "Replaced unsafe eval() with ast.literal_eval()."
 
-        # Fix 3: Missing None check / KeyError prevention
+        # Fix: Missing None check / KeyError prevention
         if "keyerror" in prob_lower or "none" in prob_lower or "null" in prob_lower:
             new_lines = []
             modified = False
             for line in lines:
                 if "[" in line and "]" in line and ".get(" not in line and "=" in line and not line.strip().startswith("#"):
-                    # Transform dict access to .get()
                     sub = re.sub(r'(\w+)\[(["\']\w+["\'])\]', r'\1.get(\2)', line)
                     if sub != line:
                         new_lines.append(sub)
@@ -193,7 +213,12 @@ class FixAgent(BaseAgent):
             if modified:
                 return "\n".join(new_lines), "Safeguarded dictionary indexing with defensive .get() calls."
 
-        # Default fallback patch: Add defensive validation comments and logging
+        # 4. For general, complex, or open-ended problems, consult Ollama LLM
+        llm_result = _try_ollama_llm()
+        if llm_result:
+            return llm_result
+
+        # 5. Default fallback patch: Add defensive validation comments and logging
         patched = (
             "# CodeAware Proposed Fix: Added defensive input validation\n"
             + original_code

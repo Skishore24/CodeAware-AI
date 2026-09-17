@@ -23,7 +23,7 @@ class OllamaService:
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: int = 120,
+        timeout: int = 30,
     ):
         self.base_url = (base_url or DEFAULT_OLLAMA_URL).rstrip("/")
         self.model = model or DEFAULT_OLLAMA_MODEL
@@ -36,7 +36,7 @@ class OllamaService:
         url = f"{self.base_url}/api/version"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "CodeAware-AI/1.0"})
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode("utf-8"))
                     version = data.get("version", "unknown")
@@ -64,7 +64,7 @@ class OllamaService:
         url = f"{self.base_url}/api/tags"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "CodeAware-AI/1.0"})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode("utf-8"))
                     return data.get("models", [])
@@ -76,9 +76,17 @@ class OllamaService:
     def get_effective_model(self) -> str:
         """
         Return the preferred model if installed, otherwise the best available installed model.
+        Safely ignores non-dict or None model entries.
         """
-        installed = [m.get("name") or m.get("model") for m in self.list_installed_models()]
-        if any(self.model in m for m in installed):
+        models_list = self.list_installed_models()
+        installed: List[str] = []
+        for m in models_list:
+            if isinstance(m, dict):
+                val = m.get("name") or m.get("model")
+                if val and isinstance(val, str):
+                    installed.append(val)
+
+        if self.model and any(self.model in m for m in installed):
             return self.model
         for candidate in ["llama3.1:8b", "llama3.2:3b", "qwen2.5-coder:7b", "codellama:7b"]:
             if any(candidate in m for m in installed):

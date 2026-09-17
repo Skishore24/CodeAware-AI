@@ -1,3 +1,4 @@
+from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
@@ -56,7 +57,7 @@ def run_autonomous_workflow(request: AutonomousRequest):
         # Persist generated patch to MySQL database
         if SessionLocal and res:
             try:
-                repo_name = request.repository_name or (request.repository_path.split("/")[-1] if request.repository_path else "default")
+                repo_name = request.repository_name or (Path(request.repository_path).name if request.repository_path else "default")
                 with SessionLocal() as db:
                     raw = res.get("raw_data", {})
                     fix_rec = AutonomousFixRecord(
