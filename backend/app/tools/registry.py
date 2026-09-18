@@ -1,4 +1,6 @@
 import os
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from app.tools.base import BaseTool, PermissionLevel, ToolDefinition
@@ -130,7 +132,11 @@ class InspectDependenciesTool(BaseTool):
         # Python requirements.txt
         req_file = repo / "requirements.txt"
         if req_file.exists():
-            deps["requirements.txt"] = [l.strip() for l in req_file.read_text().splitlines() if l.strip() and not l.startswith("#")]
+            deps["requirements.txt"] = [
+                line.strip()
+                for line in req_file.read_text().splitlines()
+                if line.strip() and not line.startswith("#")
+            ]
 
         # package.json
         pkg_file = repo / "package.json"
@@ -164,7 +170,11 @@ class InspectGitTool(BaseTool):
                     "hexsha": c.hexsha[:8],
                     "author": str(c.author),
                     "message": c.message.strip(),
-                    "date": datetime.fromtimestamp(c.committed_date).isoformat() if hasattr(c, 'committed_date') else ""
+                    "date": (
+                        datetime.fromtimestamp(c.committed_date, timezone.utc).isoformat()
+                        if hasattr(c, "committed_date")
+                        else ""
+                    ),
                 })
             return {
                 "success": True,

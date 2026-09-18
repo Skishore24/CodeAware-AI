@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   CheckCircle2,
   RefreshCw,
-  Loader2,
   Sparkles,
   ShieldCheck,
   Wrench,
@@ -18,7 +17,6 @@ import { runCodeReview } from "../api/review";
 import { useToast } from "../components/Toast";
 import { useNavigate } from "react-router-dom";
 import EmptyState from "../components/feedback/EmptyState";
-import { CardSkeleton } from "../components/feedback/Skeleton";
 import PremiumLoader from "../components/common/PremiumLoader";
 import ButtonSpinner from "../components/common/ButtonSpinner";
 

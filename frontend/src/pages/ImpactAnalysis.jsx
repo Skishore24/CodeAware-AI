@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
-  Loader2,
   AlertOctagon,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";

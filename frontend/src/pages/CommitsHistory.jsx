@@ -1,19 +1,13 @@
 import { useState, useEffect } from "react";
 import {
   GitCommit,
-  GitBranch,
   Search,
   Copy,
   Check,
   ShieldCheck,
-  Clock,
   FileCode,
   X,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
   RefreshCw,
-  FolderGit2,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { getCommits, getCommitDetails } from "../api/git";
@@ -87,7 +81,7 @@ export default function CommitsHistory() {
       if (res?.success) {
         setCommitDetails(res);
       }
-    } catch (err) {
+    } catch {
       addToast("Failed to fetch commit diff details", "error");
     } finally {
       setLoadingDetails(false);

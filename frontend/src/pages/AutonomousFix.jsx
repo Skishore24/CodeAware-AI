@@ -3,13 +3,11 @@ import {
   Wrench,
   FileCode,
   CheckCircle2,
-  Loader2,
   Sparkles,
   ArrowRight,
   GitCommit,
   RotateCcw,
   ShieldCheck,
-  Check,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runAutonomousWorkflow, approveFix, rollbackFix } from "../api/autonomous";

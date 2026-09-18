@@ -25,7 +25,7 @@ import { useRepo } from "../context/RepoContext";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "./Toast";
 
-export default function Sidebar({ onOpenPalette, mobileOpen, onCloseMobile }) {
+export default function Sidebar({ _onOpenPalette, mobileOpen, onCloseMobile }) {
   const navigate = useNavigate();
   const { activeRepo, repositories, setActiveRepo } = useRepo();
   const { user } = useAuth();

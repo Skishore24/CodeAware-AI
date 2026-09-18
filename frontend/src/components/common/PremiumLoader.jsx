@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Layers, Sparkles, Cpu, ShieldCheck, GitGraph, Code2, CheckCircle2 } from "lucide-react";
+import { Layers, Sparkles, Cpu, CheckCircle2 } from "lucide-react";
 
 /**
  * PremiumLoader

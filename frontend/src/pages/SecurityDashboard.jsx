@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   AlertOctagon,
   RefreshCw,
-  Loader2,
   Search,
   Wrench,
   MapPin,
@@ -19,7 +18,6 @@ import { useToast } from "../components/Toast";
 import SourceViewer from "../components/SourceViewer";
 import { useNavigate } from "react-router-dom";
 import EmptyState from "../components/feedback/EmptyState";
-import { CardSkeleton } from "../components/feedback/Skeleton";
 import PremiumLoader from "../components/common/PremiumLoader";
 import ButtonSpinner from "../components/common/ButtonSpinner";
 

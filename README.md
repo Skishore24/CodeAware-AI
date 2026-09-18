@@ -114,7 +114,8 @@ MYSQL_DATABASE=codeaware_db
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.1:8b
 OLLAMA_FAST_MODEL=llama3.2:3b
-OLLAMA_EMBED_MODEL=nomic-embed-text
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text:latest
+OLLAMA_TIMEOUT_SECONDS=90
 ```
 
 Apply database migrations:

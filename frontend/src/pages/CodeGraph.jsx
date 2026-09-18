@@ -7,7 +7,6 @@ import {
   ZoomOut,
   Maximize2,
   RotateCcw,
-  Info,
   Network,
   GitFork,
   LayoutGrid,
@@ -22,7 +21,6 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Crosshair,
-  Filter,
   Compass,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";

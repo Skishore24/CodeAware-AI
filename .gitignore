@@ -24,6 +24,7 @@ backend/.venv/
 */venv/
 */.venv/
 .pytest_cache/
+**/.pytest_cache/
 .coverage
 .coverage.*
 htmlcov/
@@ -31,7 +32,9 @@ nosetests.xml
 coverage.xml
 *.cover
 .ruff_cache/
+**/.ruff_cache/
 .mypy_cache/
+**/.mypy_cache/
 
 # ---------------------------------------------------------
 # Environment & Secrets
@@ -74,6 +77,8 @@ pnpm-debug.log*
 *.sqlite
 *.sqlite3
 *.db
+*.db-journal
+*.db-wal
 data/repositories/*
 !data/repositories/.gitkeep
 data/indexes/*
@@ -86,8 +91,11 @@ backend/data/*
 !backend/data/.gitkeep
 
 # ---------------------------------------------------------
-# Workspace & Sandboxes
+# Workspace, Sandboxes & Patch Backups
 # ---------------------------------------------------------
+*.bak
+*.tmp
+*.temp
 workspace/cloned_repositories/*
 !workspace/cloned_repositories/.gitkeep
 workspace/sandbox/*
