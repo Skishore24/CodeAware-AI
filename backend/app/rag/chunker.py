@@ -120,3 +120,45 @@ class CodeChunker:
                 start = max(end - self.overlap, start + 1)
 
         return documents
+
+    chunk_all = chunk_repository
+
+    def chunk_file(self, file_path: Path | str) -> List[Dict]:
+        """Chunk a single file into semantic segments."""
+        p = Path(file_path)
+        if not p.exists():
+            return []
+        source = self.read_file(p)
+        lines = source.splitlines()
+        if not lines:
+            return []
+        repo_name = self.repository_path.name if self.repository_path else "repo"
+        rel_path = str(p.relative_to(self.repository_path)).replace("\\", "/") if self.repository_path and p.is_relative_to(self.repository_path) else p.name
+        ext = p.suffix.lower()
+        lang = ext.replace(".", "")
+
+        docs = []
+        start = 0
+        chunk_idx = 0
+        while start < len(lines):
+            end = min(start + self.chunk_size, len(lines))
+            chunk_lines = lines[start:end]
+            chunk_text = "\n".join(chunk_lines)
+            docs.append({
+                "id": f"{rel_path}:chunk:{chunk_idx}",
+                "repository": repo_name,
+                "file": rel_path,
+                "language": lang,
+                "symbol": "",
+                "symbol_type": "code",
+                "start_line": start + 1,
+                "end_line": end,
+                "chunk_index": chunk_idx,
+                "content": f"FILE: {rel_path} (Lines {start + 1}-{end})\n" + chunk_text,
+                "raw_code": chunk_text
+            })
+            chunk_idx += 1
+            if end >= len(lines):
+                break
+            start = max(end - self.overlap, start + 1)
+        return docs

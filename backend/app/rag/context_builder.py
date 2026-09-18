@@ -153,3 +153,5 @@ class ContextBuilder:
         return result[
             "context"
         ]
+
+    build_context = build_text

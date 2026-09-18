@@ -1,225 +1,194 @@
-# CodeAware AI — Autonomous Code Intelligence Platform
+# CodeAware AI — Production AI Code Intelligence & Autonomous Engineering Platform
 
 <div align="center">
 
-![CodeAware AI](https://img.shields.io/badge/CodeAware-AI_Code_Intelligence-4F46E5?style=for-the-badge&logo=codeforces&logoColor=white)
+![CodeAware AI](https://img.shields.io/badge/CodeAware-AI_Autonomous_Platform-4F46E5?style=for-the-badge&logo=codeforces&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
-![React 19](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![Vite](https://img.shields.io/badge/Vite_8-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![NetworkX](https://img.shields.io/badge/NetworkX-Graph_Topology-blue?style=for-the-badge)
+![uv](https://img.shields.io/badge/uv-Fast_Python_Packaging-DE5FE9?style=for-the-badge)
+![Ollama](https://img.shields.io/badge/Ollama-Local_LLM_Inference-black?style=for-the-badge)
+![MySQL](https://img.shields.io/badge/MySQL_8.0-SQLAlchemy_2.x-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![React 19](https://img.shields.io/badge/React_19-Vite_8-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**100% Local-First, Self-Hosted Developer Intelligence** — understand any codebase, explore connected AST knowledge graphs, retrieve code with line-number citations, perform OWASP security audits, calculate blast radius, generate unit test suites, and apply verified autonomous patches.
+**100% Local-First Autonomous Software Engineering Platform** — zero cloud dependencies, powered by local Ollama LLMs (`llama3.1:8b`, `llama3.2:3b`, `nomic-embed-text`), managed with `uv`, backed by MySQL 8 with Alembic migrations, featuring long-horizon DeepAgent iteration, 21 specialist AI agents, interactive knowledge graphs, and safe sandboxed execution.
 
 </div>
 
 ---
 
-## 🌟 Key Capabilities
+## 🌟 Architecture Highlights
 
-* **100% Local-First & Privacy Preserving**: Zero data leaves your machine. Operates with deterministic AST symbol analyzers, pattern checking, TF-IDF hybrid retrieval, and local AI agents.
-* **15 Standardized Specialist AI Agents**:
-  1. `RepositoryAgent` — Tech stack detection, language distribution, file hierarchy & entry points.
-  2. `SearchAgent` — Natural language code search and symbol lookup.
-  3. `RAGAgent` — Repository-aware chunk retrieval with line-number citations.
-  4. `CodeAnalysisAgent` — AST classes, methods, parameters, and call graphs.
-  5. `BugAgent` — Syntax errors, bare excepts, runtime flaws, and unhandled exceptions.
-  6. `SecurityAgent` — Static OWASP audits (SQL injection, hardcoded secrets, command injection, path traversal, unsafe eval/exec).
-  7. `ImpactAgent` — Direct callers, indirect dependencies, affected routes, and broken tests.
-  8. `TestAgent` — Generates isolated pytest/unittest test suites with fixtures, mocks, and edge cases.
-  9. `FixAgent` — Proposes targeted patches and generates side-by-side unified diffs.
-  10. `DocumentationAgent` — Generates markdown documentation and API contracts.
-  11. `ArchitectureAgent` — Layer mapping (API, services, models, UI) and coupling risk analysis.
-  12. `PerformanceAgent` — Identifies N+1 query patterns, blocking I/O, and bottlenecks.
-  13. `CodeReviewAgent` — Evaluates code across 8 engineering quality dimensions.
-  14. `GitAgent` — Inspects commits, branches, and diff histories.
-  15. `ValidationAgent` — Isolated syntax and test validation sandbox runner.
-* **Connected Interactive Knowledge Graph**:
-  - Interactive Force-Directed network and hierarchical tree layouts.
-  - Bézier connecting edges with directional arrows (`contains`, `defines`, `calls`, `imports`).
-  - Drag-and-drop physics, canvas panning, 40%–280% zoom, sub-graph path illumination, and section maximize mode.
-* **Autonomous Patching with Unified Diffs**:
-  - Generates side-by-side code diffs with green/red line highlighting.
-  - Automatic `.bak` timestamped backups and instant rollback protection.
-* **Hybrid Code Search & RAG**:
-  - Multi-tier retrieval combining AST exact symbol matching, BM25/TF-IDF vector ranking, and fuzzy path resolution.
-* **Modern Developer Workspace**:
-  - Raycast/Linear-inspired interface with Light & Dark themes.
-  - Command Palette (`Ctrl+K` / `Cmd+K`), animated 404 page, and zero-warning build output.
+- **100% Local-First Architecture**: No cloud LLM keys required. All inference is processed via local Ollama models with a dynamic Model Router that delegates fast tasks to `llama3.2:3b` and complex reasoning/patching to `llama3.1:8b`.
+- **Modern Python Management with `uv`**: Ultra-fast dependency resolution, reproducible lockfiles (`uv.lock`), and unified workspace management.
+- **Enterprise MySQL & Alembic Migrations**: 34 fully relational models covering RBAC users, repositories, analysis runs, security findings, bugs, patches, test runs, agent runs, audit logs, RAG chunks, and knowledge graph entities.
+- **DeepAgent Long-Horizon Loop**: Self-directed autonomous engineering with iterative planning, sandbox execution, test-driven validation, tool budget limits, and loop-prevention guards.
+- **Multi-Agent Orchestrator**: Coordinates 21 specialist agents across Intent Detection, Planning, Analysis, Security Auditing, Test Generation, Patching, and Validation.
+- **19 Typed Sandbox Tools**: Granular permissions (`READ`, `WRITE`, `EXECUTE`), path traversal validation, allowlisted commands, and timestamped `.bak` automatic rollback.
+- **Code RAG & Hybrid Vector Search**: Combines AST exact symbol matching, BM25/TF-IDF keyword scoring, and normalized vector embeddings with line-level code citations.
+- **Interactive Knowledge Graph**: Canvas with force-directed physics, sub-graph path tracing, and caller/callee visualization.
+- **Production React 19 Frontend**: Raycast/Linear-inspired workspace with Command Palette (`Ctrl+K`), tabbed Repository Intelligence, Bug Tracker, and DeepAgent execution visualizer.
 
 ---
 
-## 🏗️ Architecture & Orchestration Flow
+## 🤖 21 Specialist AI Agents
 
-```text
-                     Developer Query / Request
-                                ↓
-                 ┌─────────────────────────────┐
-                 │   Hybrid Intent Classifier  │ (15 Classified Intents)
-                 └──────────────┬──────────────┘
-                                ↓
-                 ┌─────────────────────────────┐
-                 │  Task Planner & Orchestrator │
-                 └──────────────┬──────────────┘
-                                ↓
-     ┌──────────────────────────┴──────────────────────────┐
-     ↓                                                     ↓
-┌─────────────────────────────┐           ┌─────────────────────────────┐
-│  AST Symbol & Graph Engine  │           │   Hybrid RAG & Retriever    │
-│  (NetworkX Dependency Tree) │           │ (TF-IDF + Path + Exact AST) │
-└─────────────┬───────────────┘           └──────────────┬──────────────┘
-              └─────────────────────┬────────────────────┘
-                                    ↓
-                 ┌─────────────────────────────┐
-                 │   15 Specialist AI Agents   │
-                 └──────────────┬──────────────┘
-                                ↓
-                 ┌─────────────────────────────┐
-                 │  Deterministic AI Reasoner  │
-                 └──────────────┬──────────────┘
-                                ↓
-                 ┌─────────────────────────────┐
-                 │  Validation Sandbox Runner  │
-                 └──────────────┬──────────────┘
-                                ↓
-   Structured Response: Line Citations • Call Graph • Unified Diff
-```
-
----
-
-## 🛠️ Technology Stack
-
-| Layer | Technologies |
+| Agent | Focus Area & Capabilities |
 |---|---|
-| **Frontend UI** | React 19, Vite 8, React Router 7, Lucide Icons, Vanilla CSS Design System |
-| **Backend API** | Python 3.11+, FastAPI, Uvicorn, Pydantic, NetworkX |
-| **AST & Analysis** | Python `ast`, Regex Polyglot Lexers (JS/TS, Go, Java, C++, Rust) |
-| **Search & Retrieval** | Scikit-learn (TF-IDF & Logistic Regression), BM25 Token Ranking |
-| **Graph Visualization** | Custom SVG Canvas Engine with Force-directed & Radial Layouts |
-| **Quality & Linter** | `oxlint`, Python `unittest` |
+| `DeepAgent` | Long-horizon iterative bug fixing, test execution, and self-directed repair loops. |
+| `RepositoryAgent` | Tech stack detection, language breakdown, file structure, and entry points. |
+| `SearchAgent` | Natural language code search and symbol lookup across repositories. |
+| `RAGAgent` | Repository chunk retrieval with exact line-number citations. |
+| `CodeAgent` | Python/JS AST parsing, class/method extraction, and cyclomatic complexity. |
+| `BugAgent` | Syntax error detection, unhandled exceptions, and runtime bug classification. |
+| `SecurityAgent` | Static OWASP audits (SQL injection, hardcoded secrets, command injection, path traversal). |
+| `ImpactAgent` | Blast radius calculation, callers, callees, affected API routes, and broken tests. |
+| `TestAgent` | Generates isolated `pytest` and `unittest` suites with mocks and boundary tests. |
+| `FixAgent` | Generates unified git diffs and synthesizes verified patches. |
+| `DocumentationAgent` | Automated markdown documentation, docstrings, and API specs. |
+| `ArchitectureAgent` | Layer mapping (API, services, models, UI) and coupling risk analysis. |
+| `PerformanceAgent` | Scans for N+1 query patterns, blocking I/O, and CPU-intensive hotspots. |
+| `CodeReviewAgent` | Evaluates code across 8 engineering quality dimensions. |
+| `GitAgent` | Commit history, branch topology, author churn, and diff comparisons. |
+| `PRAgent` | Pull request summaries, risk evaluations, and automated review comments. |
+| `ValidationAgent` | Isolated syntax validation and test execution runner. |
+| `DependencyAgent` | Dependency security scanning, version drift, and outdated package alerts. |
+| `RefactorAgent` | Identifies cognitive complexity smells, god classes, and proposes cleaner abstractions. |
+| `DatabaseAgent` | SQL schema auditing, index recommendations, and ORM query optimization. |
+| `APIAgent` | FastAPI/Express route discovery, parameter validation, and REST contract audits. |
+| `FrontendAgent` | React component hierarchy, state flow analysis, and accessibility audits. |
+| `DevOpsAgent` | Dockerfile, CI/CD workflow, and environment configuration audits. |
 
 ---
 
-## 📁 Repository Structure
+## 🚀 Quick Start Guide
 
-```text
-CODEAWARE/
-├── backend/
-│   ├── app/
-│   │   ├── agents/          # 15 Standardized specialist agents + Orchestrator
-│   │   ├── ai/              # Local deterministic reasoning engine & interfaces
-│   │   ├── analysis/        # AST polyglot parser & vulnerability scanner
-│   │   ├── api/             # FastAPI REST endpoints (repos, search, graph, etc.)
-│   │   ├── config/          # Environment settings & directory paths
-│   │   ├── db/              # In-memory & SQLite metadata stores
-│   │   ├── graph/           # Knowledge graph builder & impact analyzer
-│   │   ├── ml/              # 15-intent classifier with TF-IDF
-│   │   ├── rag/             # Chunker, vector stores, hybrid retriever
-│   │   ├── services/        # Ingestion, RAG, Graph, and Autonomous workflows
-│   │   └── main.py          # FastAPI application entry point
-│   ├── tests/               # Backend unit & integration test suite
-│   └── requirements.txt     # Python backend dependencies
-│
-├── frontend/
-│   ├── src/
-│   │   ├── api/             # HTTP API client and endpoint helpers
-│   │   ├── components/      # Sidebar, Header, CommandPalette, SourceViewer, DiffViewer
-│   │   ├── context/         # AuthContext, RepoContext, ThemeContext
-│   │   ├── pages/           # Dashboard, Repositories, CodeSearch, AgentChat,
-│   │   │                    # CodeGraph, ImpactAnalysis, AutonomousFix,
-│   │   │                    # CodeReview, SecurityDashboard, TestGenerator, Settings
-│   │   ├── index.css        # Modern design system & animation tokens
-│   │   ├── App.jsx          # Route layout & initialization gate
-│   │   └── main.jsx
-│   ├── package.json
-│   └── vite.config.js
-│
-├── .gitignore               # Comprehensive Git ignore rules
-└── README.md                # Project documentation
-```
-
----
-
-## ⚡ Quick Start
+> [!IMPORTANT]
+> **Strict Package Management with `uv` (No `pip`)**  
+> This project strictly uses [`uv`](https://docs.astral.sh/uv/) for Python dependency, environment, and execution management:
+> - **DO NOT** use `pip install` or manual `python -m venv`. `uv` manages the virtual environment automatically in `.venv`.
+> - **Sync Environment**: `uv sync --all-extras`
+> - **Start Server**: `uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
+> - **Run Migrations**: `uv run alembic upgrade head`
+> - **Run Tests**: `uv run pytest tests/ -v`
+> - **Add Dependencies**: `uv add <package_name>` (or `uv add --dev <package_name>`)
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **Python**: v3.10 or higher
-- **Git**
+
+1. **Python 3.10+** and [uv](https://docs.astral.sh/uv/getting-started/installation/):
+   ```bash
+   # On Windows (PowerShell):
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+   # On Linux/macOS:
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+2. **Node.js 18+** and `npm`
+3. **MySQL 8.0+** running locally
+4. **Ollama** installed with models:
+   ```bash
+   ollama pull llama3.1:8b
+   ollama pull llama3.2:3b
+   ollama pull nomic-embed-text
+   ```
 
 ---
 
-### 1. Clone & Setup Backend
+### 1. Database Setup (MySQL)
+
+Create the local database in MySQL:
+
+```sql
+CREATE DATABASE IF NOT EXISTS codeaware_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Configure `backend/.env` with your database credentials:
+
+```env
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=Admin@123
+MYSQL_DATABASE=codeaware_db
+
+# Local Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+OLLAMA_FAST_MODEL=llama3.2:3b
+OLLAMA_EMBED_MODEL=nomic-embed-text
+```
+
+Apply database migrations:
 
 ```bash
-cd backend
-
-# Create and activate virtual environment
-python -m venv venv
-# On Windows:
-.\venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start FastAPI development server
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uv run alembic upgrade head
 ```
-Backend API will be running at [http://127.0.0.1:8000](http://127.0.0.1:8000) (Interactive Swagger Docs at `/docs`).
 
 ---
 
-### 2. Setup & Launch Frontend
+### 2. Backend Installation & Start (with `uv`)
+
+```bash
+# 1. Sync all dependencies and build local environment (DO NOT use pip)
+uv sync --all-extras
+
+# 2. Start the FastAPI development server with uv
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+FastAPI server runs at [http://127.0.0.1:8000](http://127.0.0.1:8000).  
+Interactive Swagger documentation is available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+
+---
+
+### 3. Frontend Installation & Start
 
 ```bash
 cd frontend
 
-# Install Node dependencies
+# Install dependencies
 npm install
 
 # Start Vite dev server
 npm run dev
 ```
+
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## ⌨️ Navigation & Keyboard Shortcuts
+## 🧪 Verification & Testing
 
-| Shortcut | Action |
-|---|---|
-| `Ctrl + K` / `Cmd + K` | Open Universal Command Palette |
-| `Ctrl + P` / `Cmd + P` | Quick Switch Repository |
-| `Esc` | Close Modal / Command Palette |
-| `Scroll Wheel` | Zoom in/out on Knowledge Graph |
-| `Click + Drag` | Pan canvas / Drag graph nodes |
-
----
-
-## 🧪 Verification & Code Quality
+### Run Backend Test Suite (33 Automated Tests)
 
 ```bash
-# Run frontend linter (0 warnings)
+uv run pytest tests/ -v
+```
+
+### Run Backend Linter
+
+```bash
+uv run ruff check tests/
+```
+
+### Run Frontend Linter & Production Build
+
+```bash
 cd frontend
 npm run lint
-
-# Run frontend production build
-cd frontend
 npm run build
 ```
 
 ---
 
-## 🔒 Security & Sandboxing
+## 🔒 Security & Sandbox Guarantees
 
-* **Strict Path Traversal Guards**: Every file system access strictly verifies that the target path resolves inside the active repository root sandbox.
-* **Automated Patch Backups**: Every patch generates timestamped `.bak` files with automatic rollback on test or syntax failure.
-* **Static OWASP Rules**: Detects SQL injection, hardcoded API secrets, insecure deserialization, command execution (`subprocess`, `eval`), and unhandled exceptions.
+1. **Path Boundary Validation**: Every file tool validates target paths against the repository sandbox root. Path traversal attempts (`../../etc/passwd`) are rejected with `SecuritySandboxException`.
+2. **Command Allowlist**: Execution is strictly restricted to safe commands (`pytest`, `unittest`, `npm test`, `ruff`, `mypy`, `oxlint`). Unsafe commands are blocked.
+3. **Automated Rollback**: All patches create timestamped `.bak` files. In the event of syntax errors or failed tests, files are immediately restored.
+4. **RBAC & Token Security**: Secure bcrypt password hashing, HS256 JWT tokens, and role-based access control.
 
 ---
 
-<div align="center">
-Built with ❤️ for modern software engineering teams.
-</div>
+## 📄 License
+
+MIT License. Built for engineering teams building resilient, production software.

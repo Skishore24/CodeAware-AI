@@ -17,6 +17,9 @@ import {
   Plus,
   Check,
   X,
+  Bug,
+  Sparkles,
+  GitCommit,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { useAuth } from "../context/AuthContext";
@@ -187,6 +190,10 @@ export default function Sidebar({ onOpenPalette, mobileOpen, onCloseMobile }) {
             <span className="nav-item-badge">{repositories.length}</span>
           )}
         </NavLink>
+        <NavLink to="/commits" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <GitCommit size={16} />
+          <span>Commits & Branch</span>
+        </NavLink>
         <NavLink to="/search" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <Search size={16} />
           <span>Code Search</span>
@@ -199,12 +206,20 @@ export default function Sidebar({ onOpenPalette, mobileOpen, onCloseMobile }) {
           <ShieldAlert size={16} />
           <span>Security</span>
         </NavLink>
+        <NavLink to="/bugs" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <Bug size={16} />
+          <span>Bug Tracker</span>
+        </NavLink>
 
         {/* INTELLIGENCE */}
         <div className="nav-section-label">Intelligence</div>
         <NavLink to="/agent" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <Bot size={16} />
           <span>AI Assistant</span>
+        </NavLink>
+        <NavLink to="/deep-agent" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <Sparkles size={16} />
+          <span>Deep Agent</span>
         </NavLink>
         <NavLink to="/graph" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
           <GitGraph size={16} />
@@ -262,15 +277,6 @@ export default function Sidebar({ onOpenPalette, mobileOpen, onCloseMobile }) {
             {user ? user.name : "Guest"}
           </div>
         </div>
-
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={onOpenPalette}
-          title="Command Palette (Ctrl+K)"
-          style={{ padding: "3px 7px", fontSize: "11px", color: "var(--text-muted)" }}
-        >
-          ⌘K
-        </button>
       </div>
     </aside>
   );

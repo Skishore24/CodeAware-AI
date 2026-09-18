@@ -5,10 +5,13 @@ import urllib.request
 import urllib.error
 import json
 
+from app.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
+DEFAULT_OLLAMA_URL = getattr(settings, "OLLAMA_BASE_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+DEFAULT_OLLAMA_MODEL = getattr(settings, "OLLAMA_MODEL", os.getenv("OLLAMA_MODEL", "llama3.1:8b"))
+DEFAULT_OLLAMA_TIMEOUT = max(90, getattr(settings, "OLLAMA_TIMEOUT_SECONDS", 90))
 
 
 class OllamaService:
@@ -23,7 +26,7 @@ class OllamaService:
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: int = 30,
+        timeout: int = DEFAULT_OLLAMA_TIMEOUT,
     ):
         self.base_url = (base_url or DEFAULT_OLLAMA_URL).rstrip("/")
         self.model = model or DEFAULT_OLLAMA_MODEL

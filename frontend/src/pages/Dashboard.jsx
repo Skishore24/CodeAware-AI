@@ -13,12 +13,15 @@ import {
   GitGraph,
   GitFork,
   ShieldAlert,
+  GitCommit,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { scanRepository } from "../api/repositories";
 import { runSecurityScan } from "../api/security";
 import HeroIllustration from "../components/visual/HeroIllustration";
 import PipelineSteps from "../components/visual/PipelineSteps";
+import BranchSelector from "../components/git/BranchSelector";
+import CommitStrip from "../components/git/CommitStrip";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -198,7 +201,7 @@ export default function Dashboard() {
 
       {/* Real Repository Snapshot Metrics */}
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap", gap: "10px" }}>
           <div>
             <h2 style={{ fontSize: "17px", fontWeight: 800 }}>Repository Snapshot</h2>
             <p style={{ fontSize: "12.5px", color: "var(--text-muted)", marginTop: "2px" }}>
@@ -206,12 +209,31 @@ export default function Dashboard() {
             </p>
           </div>
           {activeRepo && (
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate("/repos")}>
-              <span>Switch Repository</span>
-              <ArrowRight size={13} />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate("/commits")}>
+                <GitCommit size={13} />
+                <span>Commits & History</span>
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => navigate("/repos")}>
+                <span>Switch Repository</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
           )}
         </div>
+
+        {/* GitHub-style Branch Selector and Commit Strip */}
+        {activeRepo && (
+          <div style={{ marginBottom: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <BranchSelector activeRepo={activeRepo} />
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                Active Git branch in cloned workspace
+              </span>
+            </div>
+            <CommitStrip activeRepo={activeRepo} />
+          </div>
+        )}
 
         <div className="grid-4">
           {/* Files */}

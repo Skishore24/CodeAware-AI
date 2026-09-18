@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Check, FileDiff, CheckCircle2, XCircle } from "lucide-react";
+import { Copy, Check, FileDiff, CheckCircle2, XCircle, ShieldCheck } from "lucide-react";
 
 /**
  * Professional Diff Viewer for CodeAware AI Autonomous Fix and Code Review.
@@ -10,6 +10,8 @@ export default function DiffViewer({
   diff,
   originalCode,
   patchedCode,
+  original,
+  modified,
   filePath = "code.py",
   riskLevel = "LOW",
   syntaxValid = true,
@@ -21,13 +23,16 @@ export default function DiffViewer({
 }) {
   const [copied, setCopied] = useState(false);
 
+  const effectiveOrig = originalCode || original || "";
+  const effectivePatch = patchedCode || modified || "";
+
   // If a unified diff string is not provided, generate a basic unified representation
   let diffLines = [];
   if (diff && typeof diff === "string") {
     diffLines = diff.split("\n");
-  } else if (originalCode && patchedCode) {
-    const origLines = originalCode.split("\n");
-    const patchLines = patchedCode.split("\n");
+  } else if (effectiveOrig && effectivePatch) {
+    const origLines = effectiveOrig.split("\n");
+    const patchLines = effectivePatch.split("\n");
     diffLines.push(`--- a/${filePath}`);
     diffLines.push(`+++ b/${filePath}`);
     origLines.forEach((l) => diffLines.push(`-${l}`));

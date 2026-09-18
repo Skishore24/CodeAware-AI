@@ -1,11 +1,14 @@
-from typing import Any, Dict, Optional
-from fastapi import APIRouter, HTTPException
+from typing import Any, Dict, Optional, List
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.agents.code_review_agent import CodeReviewAgent
-from app.db.database import SessionLocal
+from app.core.logging import get_logger
+from app.db.database import SessionLocal, get_db
 from app.db.models import ReviewRecord
 
+logger = get_logger("app.api.review")
 
 router = APIRouter(
     prefix="/review",
@@ -43,9 +46,46 @@ def review_code(request: CodeReviewRequest) -> Dict[str, Any]:
                     )
                     db.add(rec)
                     db.commit()
-            except Exception:
-                pass
+                    logger.info(f"Persisted ReviewRecord id={rec.id} to MySQL for {repo_name}")
+            except Exception as dberr:
+                logger.error(f"Failed to persist review record to MySQL: {dberr}", exc_info=True)
 
         return res
     except Exception as exc:
+        logger.error(f"Review code failed: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/history")
+def get_review_history(
+    repository_name: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Fetch stored review records from MySQL workbench / codeaware_db."""
+    try:
+        query = db.query(ReviewRecord).order_by(ReviewRecord.created_at.desc())
+        if repository_name:
+            query = query.filter(ReviewRecord.repository_name == repository_name)
+        records = query.limit(limit).all()
+        return {
+            "success": True,
+            "count": len(records),
+            "records": [
+                {
+                    "id": r.id,
+                    "repository_name": r.repository_name,
+                    "overall_score": r.overall_score,
+                    "summary": r.summary,
+                    "dimensions": r.dimensions_json,
+                    "findings": r.findings_json,
+                    "recommendations": r.recommendations_json,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in records
+            ],
+        }
+    except Exception as exc:
+        logger.error(f"Failed to fetch review history: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+

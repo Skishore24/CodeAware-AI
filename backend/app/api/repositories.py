@@ -10,8 +10,11 @@ from app.services.rag_service import RAGService
 from app.services.repository_ingestion import RepositoryIngestionService
 from app.analysis.repository_scanner import RepositoryScanner
 from app.analysis.code_analyzer import CodeAnalyzer
+from app.core.logging import get_logger
 from app.db.database import get_db, SessionLocal
 from app.db.models import Repository as DBRepository
+
+logger = get_logger("app.api.repositories")
 
 router = APIRouter(
     prefix="/repositories",
@@ -68,26 +71,79 @@ def _resolve_repo_path(repo_name: Optional[str], repo_path: Optional[str]) -> Pa
         return target
     if p.exists():
         return p
+
+    # Database lookup by repository name
+    try:
+        db = SessionLocal()
+        try:
+            db_repo = db.query(DBRepository).filter(DBRepository.name == ref).first()
+            if db_repo and db_repo.local_path and Path(db_repo.local_path).exists():
+                return Path(db_repo.local_path).resolve()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
     raise HTTPException(
         status_code=404,
         detail=f"Repository not found at: {ref}"
     )
 
 # ---------------------------------------------------------
-# List Cloned Repositories
+# List Cloned & Indexed Repositories
 # ---------------------------------------------------------
 
 @router.get("/list")
 @router.get("")
 def list_repositories():
     """
-    List all repositories currently cloned in the workspace.
+    List all repositories currently cloned in the workspace or registered in the database.
     """
-    repos = repository_service.list_repositories()
+    cloned_repos = repository_service.list_repositories()
+    repo_map = {r["name"].lower(): r for r in cloned_repos}
+
+    try:
+        db = SessionLocal()
+        try:
+            db_repos = db.query(DBRepository).all()
+            for dbr in db_repos:
+                key = dbr.name.lower()
+                local_exists = dbr.local_path and Path(dbr.local_path).exists()
+                if key in repo_map:
+                    repo_map[key].update({
+                        "id": dbr.id,
+                        "primary_language": dbr.primary_language or "General",
+                        "total_functions": dbr.total_functions or 0,
+                        "total_classes": dbr.total_classes or 0,
+                        "is_indexed": dbr.is_indexed if dbr.is_indexed is not None else True,
+                        "clone_url": dbr.clone_url,
+                        "last_scanned_at": dbr.last_scanned_at.isoformat() if dbr.last_scanned_at else None,
+                    })
+                    if not repo_map[key].get("files_count") and dbr.files_count:
+                        repo_map[key]["files_count"] = dbr.files_count
+                elif local_exists:
+                    repo_map[key] = {
+                        "id": dbr.id,
+                        "name": dbr.name,
+                        "path": str(Path(dbr.local_path).resolve()),
+                        "files_count": dbr.files_count or 0,
+                        "primary_language": dbr.primary_language or "General",
+                        "total_functions": dbr.total_functions or 0,
+                        "total_classes": dbr.total_classes or 0,
+                        "is_indexed": dbr.is_indexed if dbr.is_indexed is not None else True,
+                        "clone_url": dbr.clone_url,
+                        "last_scanned_at": dbr.last_scanned_at.isoformat() if dbr.last_scanned_at else None,
+                    }
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning(f"Failed to query database repositories in list_repositories: {exc}")
+
+    merged = sorted(repo_map.values(), key=lambda r: r["name"].lower())
     return {
         "success": True,
-        "count": len(repos),
-        "repositories": repos,
+        "count": len(merged),
+        "repositories": merged,
     }
 
 
@@ -300,8 +356,9 @@ def scan_repository(
                     existing.languages_json = result.get("languages", {})
                     existing.frameworks_json = result.get("frameworks", [])
                     db.commit()
+                    logger.info(f"Persisted repository '{repo_name}' metadata to MySQL database.")
             except Exception as dberr:
-                pass
+                logger.error(f"Failed to persist repository '{repository_path.name}' to MySQL: {dberr}", exc_info=True)
 
         return {
 

@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional
 import time
+from typing import Any, Dict, List, Optional
 
 from app.agents.repository_agent import RepositoryAgent
 from app.agents.search_agent import SearchAgent
@@ -16,7 +16,15 @@ from app.agents.performance_agent import PerformanceAgent
 from app.agents.code_review_agent import CodeReviewAgent
 from app.agents.git_agent import GitAgent
 from app.agents.validation_agent import ValidationAgent
+from app.agents.dependency_agent import DependencyAgent
+from app.agents.refactor_agent import RefactorAgent
+from app.agents.database_agent import DatabaseAgent
+from app.agents.api_agent import APIAgent
+from app.agents.frontend_agent import FrontendAgent
+from app.agents.devops_agent import DevOpsAgent
 
+from app.ai.collaboration import multi_agent_engine
+from app.deep_agent.agent import DeepAgent
 from app.ml.intent_classifier import IntentClassifier
 from app.services.rag_service import RAGService
 from app.services.graph_service import GraphService
@@ -24,9 +32,8 @@ from app.services.graph_service import GraphService
 
 class CodeAwareOrchestrator:
     """
-    Central Multi-Agent Orchestrator and Task Planner for CodeAware AI.
-    Routes queries based on hybrid intent classification, coordinates multi-agent pipelines,
-    records execution timelines, and aggregates structured results.
+    Central Multi-Agent Orchestrator, Task Planner and Router for CodeAware AI.
+    Routes queries between quick specialist agents, multi-agent collaboration, and DeepAgent.
     """
 
     def __init__(self):
@@ -34,7 +41,7 @@ class CodeAwareOrchestrator:
         self.rag_service = RAGService()
         self.graph_service = GraphService()
 
-        # Specialist Agents
+        # Specialist Agents (All 21 Standardized Agents)
         self.repository_agent = RepositoryAgent()
         self.search_agent = SearchAgent(rag_service=self.rag_service)
         self.rag_agent = RAGAgent(rag_service=self.rag_service)
@@ -50,9 +57,18 @@ class CodeAwareOrchestrator:
         self.code_review_agent = CodeReviewAgent()
         self.git_agent = GitAgent()
         self.validation_agent = ValidationAgent()
+        self.dependency_agent = DependencyAgent()
+        self.refactor_agent = RefactorAgent()
+        self.database_agent = DatabaseAgent()
+        self.api_agent = APIAgent()
+        self.frontend_agent = FrontendAgent()
+        self.devops_agent = DevOpsAgent()
 
         # Intent Classifier
         self.intent_classifier = IntentClassifier()
+
+        # Deep Agent
+        self.deep_agent = DeepAgent()
 
     def run(self, task: str, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -69,9 +85,31 @@ class CodeAwareOrchestrator:
                 "timeline": [{"step": "Validation", "status": "FAILED", "message": "Empty task query provided."}]
             }
 
-        timeline: List[Dict[str, Any]] = []
+        # Check if caller explicitly requested DeepAgent
+        if input_data.get("mode") == "deep_agent" or any(kw in task.lower() for kw in ["long-horizon", "deep analysis", "deep fix", "autonomous loop"]):
+            deep_res = self.deep_agent.run(
+                goal=task,
+                repository_path=input_data.get("repository_path"),
+                max_iterations=input_data.get("max_iterations", 6),
+            )
+            return {
+                "success": deep_res.get("success", False),
+                "intent": "deep_agent",
+                "summary": deep_res.get("final_report", "DeepAgent execution complete."),
+                "deep_agent_result": deep_res,
+                "findings": [],
+                "files": [],
+                "recommendations": ["Review DeepAgent steps and applied patches."],
+                "evidence": deep_res.get("steps", []),
+                "timeline": [{"step": s["action"], "status": s["status"], "message": s["details"]} for s in deep_res.get("steps", [])],
+                "duration_sec": deep_res.get("duration_sec", 0.0),
+            }
 
-        # 1. Step: Task Received
+        # Check if multi-agent collaboration is warranted
+        if input_data.get("mode") == "collaborative" or any(kw in task.lower() for kw in ["why is", "investigate", "audit and fix", "find why"]):
+            return multi_agent_engine.execute_collaborative_workflow(task, input_data)
+
+        timeline: List[Dict[str, Any]] = []
         timeline.append({
             "step": "Task Received",
             "status": "COMPLETED",
@@ -79,7 +117,7 @@ class CodeAwareOrchestrator:
             "timestamp": round(time.time() - start_time, 3)
         })
 
-        # 2. Step: Intent Detection
+        # Intent Detection
         try:
             intent_result = self.intent_classifier.predict(task)
             primary_intent = intent_result.get("intent", "code_search")
@@ -103,7 +141,6 @@ class CodeAwareOrchestrator:
                 "timestamp": round(time.time() - start_time, 3)
             })
 
-        # 3. Route to primary agent and execute pipeline
         agent_data = {**input_data, "task": task, "question": task, "query": task}
         agent_result: Dict[str, Any] = {}
         chained_results: Dict[str, Any] = {}
@@ -121,7 +158,6 @@ class CodeAwareOrchestrator:
 
             elif primary_intent == "impact_analysis":
                 timeline.append({"step": "Knowledge Graph Traversal", "status": "RUNNING", "timestamp": round(time.time() - start_time, 3)})
-                # Extract symbol if possible from query
                 words = task.split()
                 symbol_candidate = words[-1].strip("?.,'\"") if words else ""
                 agent_result = self.impact_agent.run({**agent_data, "symbol": agent_data.get("symbol") or symbol_candidate})
@@ -137,7 +173,6 @@ class CodeAwareOrchestrator:
                 agent_result = self.bug_agent.run(agent_data)
                 timeline[-1]["status"] = "COMPLETED"
 
-                # If multi-intent includes fix_request, chain FixAgent & ValidationAgent
                 if secondary_intent == "fix_request" or "fix" in task.lower():
                     timeline.append({"step": "FixAgent Patch Generation", "status": "RUNNING", "timestamp": round(time.time() - start_time, 3)})
                     fix_res = self.fix_agent.run({**agent_data, "problem": task})
@@ -195,6 +230,18 @@ class CodeAwareOrchestrator:
                 agent_result = self.git_agent.run(agent_data)
                 timeline[-1]["status"] = "COMPLETED"
 
+            elif "depend" in task.lower() or "package" in task.lower():
+                agent_result = self.dependency_agent.run(agent_data)
+            elif "database" in task.lower() or "sql" in task.lower():
+                agent_result = self.database_agent.run(agent_data)
+            elif "api" in task.lower() or "route" in task.lower():
+                agent_result = self.api_agent.run(agent_data)
+            elif "frontend" in task.lower() or "react" in task.lower():
+                agent_result = self.frontend_agent.run(agent_data)
+            elif "devops" in task.lower() or "docker" in task.lower():
+                agent_result = self.devops_agent.run(agent_data)
+            elif "refactor" in task.lower():
+                agent_result = self.refactor_agent.run(agent_data)
             else:
                 agent_result = self.rag_agent.run(agent_data)
 
@@ -210,7 +257,6 @@ class CodeAwareOrchestrator:
                 "recommendations": []
             }
 
-        # 4. Final Aggregation
         timeline.append({
             "step": "Response Aggregation",
             "status": "COMPLETED",
@@ -236,3 +282,34 @@ class CodeAwareOrchestrator:
             "chained_results": chained_results,
             "execution_duration_sec": round(time.time() - start_time, 3)
         }
+
+    def execute_agent(self, agent_name: str, task_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute a specific named specialist agent directly."""
+        name_clean = agent_name.lower()
+        task_input = task_input or {}
+        agent_map = {
+            "refactor": self.refactor_agent,
+            "dependency": self.dependency_agent,
+            "database": self.database_agent,
+            "api": self.api_agent,
+            "frontend": self.frontend_agent,
+            "devops": self.devops_agent,
+            "security": self.security_agent,
+            "bug": self.bug_agent,
+            "test": self.test_agent,
+            "fix": self.fix_agent,
+            "review": self.code_review_agent,
+            "git": self.git_agent,
+        }
+        for key, ag in agent_map.items():
+            if key in name_clean:
+                return ag.run(task_input)
+        return self.run(agent_name, task_input)
+
+    def run_multi_agent_collaboration(self, objective: str, repository_path: Optional[str] = None) -> Dict[str, Any]:
+        """Run collaborative multi-agent plan and execution."""
+        from app.ai.collaboration import multi_agent_engine
+        return multi_agent_engine.execute_collaborative_workflow(
+            task=objective,
+            input_data={"repository_path": repository_path}
+        )

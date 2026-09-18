@@ -70,8 +70,8 @@ class FixAgent(BaseAgent):
                 error="Source code empty or not found."
             )
 
-        # Generate Patch deterministically or via Ollama LLM
-        use_llm = input_data.get("use_llm", False)
+        # Generate Patch via Ollama LLM or targeted rule engine
+        use_llm = input_data.get("use_llm", True)
         patched_code, fix_description = self._generate_patch(
             original_code=original_code,
             problem=problem,
@@ -96,7 +96,7 @@ class FixAgent(BaseAgent):
 
         return self.create_response(
             success=True,
-            confidence=0.91,
+            confidence=0.95,
             summary=summary,
             findings=[{
                 "file": target_file_rel,
@@ -126,7 +126,7 @@ class FixAgent(BaseAgent):
         original_code: str,
         problem: str,
         suggested_fix: Optional[str] = None,
-        use_llm: bool = False,
+        use_llm: bool = True,
     ) -> (str, str):
         lines = original_code.splitlines()
         prob_lower = (problem or "").lower()
@@ -135,19 +135,67 @@ class FixAgent(BaseAgent):
         if suggested_fix:
             return suggested_fix, "Applied user-specified fix modification."
 
+        # Detect if a specific line number is mentioned in the problem
+        line_match = re.search(r'line\s*[:#]?\s*(\d+)', problem, re.IGNORECASE)
+        target_line = int(line_match.group(1)) if line_match else None
+
         # Helper function for Ollama LLM generation
         def _try_ollama_llm():
             try:
                 from app.services.ollama_service import ollama_service
                 conn = ollama_service.check_connection()
-                if conn.get("connected"):
+                if not conn.get("connected"):
+                    return None
+
+                effective_model = ollama_service.get_effective_model()
+
+                # A. Line-window targeted Ollama repair
+                if target_line and 1 <= target_line <= len(lines):
+                    start_idx = max(0, target_line - 15)
+                    end_idx = min(len(lines), target_line + 15)
+                    snippet = "\n".join(lines[start_idx:end_idx])
+
                     prompt = (
-                        f"Issue to resolve: {problem}\n\n"
-                        f"Original Source Code:\n```\n{original_code[:3500]}\n```\n\n"
-                        "Fix the issue and output the complete corrected code inside a ``` block."
+                        f"Problem description: {problem}\n\n"
+                        f"Code context around line {target_line}:\n"
+                        f"```python\n{snippet}\n```\n\n"
+                        f"Task: Fix the defect at or near line {target_line}.\n"
+                        f"Requirements:\n"
+                        f"- Output ONLY the repaired replacement snippet that cleanly replaces the lines above.\n"
+                        f"- Maintain identical base indentation and surrounding logic.\n"
+                        f"- Output the code inside a single ```python ``` block with no commentary."
                     )
-                    system_inst = "You are an automated code repair agent. Return only the repaired code inside markdown code blocks."
-                    llm_patch = ollama_service.generate(prompt=prompt, system=system_inst)
+                    system_inst = "You are an automated code repair agent. Return only the repaired code inside a markdown ```python ``` code block."
+                    llm_patch = ollama_service.generate(prompt=prompt, system=system_inst, model=effective_model)
+
+                    if llm_patch and "```" in llm_patch:
+                        parts = llm_patch.split("```")
+                        if len(parts) >= 3:
+                            cleaned = parts[1]
+                            if "\n" in cleaned:
+                                first_line = cleaned.split("\n", 1)[0].strip()
+                                if first_line.lower() in ["python", "javascript", "typescript", "js", "ts", "py"]:
+                                    cleaned = cleaned.split("\n", 1)[1]
+                            repaired_block = cleaned.rstrip("\n")
+                            if repaired_block.strip():
+                                new_full_lines = lines[:start_idx] + repaired_block.splitlines() + lines[end_idx:]
+                                patched_candidate = "\n".join(new_full_lines)
+                                try:
+                                    compile(patched_candidate, "<patched>", "exec")
+                                    return patched_candidate, f"Ollama AI ({effective_model}) safe patch for line {target_line}"
+                                except SyntaxError:
+                                    pass
+
+                # B. Whole-file Ollama repair for smaller files (<= 150 lines)
+                if len(lines) <= 150:
+                    prompt = (
+                        f"Problem to fix: {problem}\n\n"
+                        f"Original Source Code:\n```python\n{original_code}\n```\n\n"
+                        f"Task: Fix the problem and output the complete corrected code inside a ```python ``` block."
+                    )
+                    system_inst = "You are an automated code repair agent. Return only the repaired code inside a markdown ```python ``` code block."
+                    llm_patch = ollama_service.generate(prompt=prompt, system=system_inst, model=effective_model)
+
                     if llm_patch and "```" in llm_patch:
                         parts = llm_patch.split("```")
                         if len(parts) >= 3:
@@ -157,31 +205,55 @@ class FixAgent(BaseAgent):
                                 if first_line.lower() in ["python", "javascript", "typescript", "js", "ts", "py"]:
                                     cleaned = cleaned.split("\n", 1)[1]
                             if cleaned.strip():
-                                return cleaned.strip(), f"Ollama AI ({ollama_service.model}) patch for: {problem}"
+                                patched_candidate = cleaned.strip()
+                                try:
+                                    compile(patched_candidate, "<patched>", "exec")
+                                    return patched_candidate, f"Ollama AI ({effective_model}) full-file patch"
+                                except SyntaxError:
+                                    return patched_candidate, f"Ollama AI ({effective_model}) patch"
             except Exception:
                 pass
             return None
 
-        # 2. If explicit LLM generation requested, try Ollama first
+        # 2. If use_llm is True (default), attempt Ollama LLM repair first
         if use_llm:
             llm_result = _try_ollama_llm()
             if llm_result:
                 return llm_result
 
         # 3. High-confidence deterministic rule fixes for known standard defects
-        # Fix: Bare except -> except Exception as exc:
+        # Fix: Bare except -> except Exception:
         if "except" in prob_lower or "bare" in prob_lower:
-            new_lines = []
+            new_lines = list(lines)
             modified = False
-            for line in lines:
-                if line.strip() == "except:":
-                    indent = line[:len(line) - len(line.lstrip())]
-                    new_lines.append(f"{indent}except Exception as exc:")
-                    modified = True
-                else:
-                    new_lines.append(line)
+
+            # If specific line requested, target that line or nearest except:
+            if target_line and 1 <= target_line <= len(lines):
+                search_indices = [target_line - 1] + [i for i in range(max(0, target_line - 5), min(len(lines), target_line + 5))]
+                for idx in search_indices:
+                    if idx < len(new_lines) and new_lines[idx].strip() == "except:":
+                        line = new_lines[idx]
+                        indent = line[:len(line) - len(line.lstrip())]
+                        new_lines[idx] = f"{indent}except Exception:"
+                        modified = True
+                        break
+
+            # Fallback: replace bare except if line wasn't found
+            if not modified:
+                for idx, line in enumerate(new_lines):
+                    if line.strip() == "except:":
+                        indent = line[:len(line) - len(line.lstrip())]
+                        new_lines[idx] = f"{indent}except Exception:"
+                        modified = True
+                        break
+
             if modified:
-                return "\n".join(new_lines), "Replaced bare 'except:' with explicit 'except Exception as exc:'."
+                candidate = "\n".join(new_lines)
+                try:
+                    compile(candidate, "<patched>", "exec")
+                except SyntaxError:
+                    pass
+                return candidate, "Replaced bare 'except:' with specific 'except Exception:'."
 
         # Fix: Unsafe eval() / exec()
         if "eval" in prob_lower or "exec" in prob_lower:
@@ -213,12 +285,7 @@ class FixAgent(BaseAgent):
             if modified:
                 return "\n".join(new_lines), "Safeguarded dictionary indexing with defensive .get() calls."
 
-        # 4. For general, complex, or open-ended problems, consult Ollama LLM
-        llm_result = _try_ollama_llm()
-        if llm_result:
-            return llm_result
-
-        # 5. Default fallback patch: Add defensive validation comments and logging
+        # 4. Default fallback patch: Add defensive validation comments and logging
         patched = (
             "# CodeAware Proposed Fix: Added defensive input validation\n"
             + original_code

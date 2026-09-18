@@ -24,3 +24,10 @@ export function approveFix(data) {
 export function createPullRequest(data) {
   return client.post("/autonomous/create-pr", data);
 }
+
+/**
+ * Rollback an applied fix from backup or original code.
+ */
+export function rollbackFix(data) {
+  return client.post("/autonomous/rollback", data);
+}

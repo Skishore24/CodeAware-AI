@@ -7,13 +7,18 @@ import {
   Sparkles,
   ArrowRight,
   GitCommit,
+  RotateCcw,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
-import { runAutonomousWorkflow, approveFix } from "../api/autonomous";
+import { runAutonomousWorkflow, approveFix, rollbackFix } from "../api/autonomous";
 import { useToast } from "../components/Toast";
 import { useLocation } from "react-router-dom";
 import DiffViewer from "../components/DiffViewer";
 import EmptyState from "../components/feedback/EmptyState";
+import ButtonSpinner from "../components/common/ButtonSpinner";
+import PremiumLoader from "../components/common/PremiumLoader";
 
 export default function AutonomousFix() {
   const location = useLocation();
@@ -24,8 +29,11 @@ export default function AutonomousFix() {
   const [problem, setProblem] = useState(location.state?.targetProblem || "");
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
   const [result, setResult] = useState(null);
   const [applied, setApplied] = useState(false);
+  const [appliedInfo, setAppliedInfo] = useState(null);
+  const [autoApply, setAutoApply] = useState(false);
 
   useEffect(() => {
     if (location.state?.targetFile) {
@@ -58,6 +66,7 @@ export default function AutonomousFix() {
     setLoading(true);
     setResult(null);
     setApplied(false);
+    setAppliedInfo(null);
 
     try {
       const data = await runAutonomousWorkflow({
@@ -65,11 +74,18 @@ export default function AutonomousFix() {
         repository_path: activeRepo.path || activeRepo.name,
         file_path: filePath.trim(),
         problem: problem.trim(),
+        auto_apply: autoApply,
       });
 
       setResult(data);
       if (data?.success) {
-        addToast("Proposed patch and validation test synthesized successfully.", "success");
+        if (data.applied_to_repo) {
+          setApplied(true);
+          setAppliedInfo(data.applied_info);
+          addToast(`Fix verified and applied to cloned repository at: ${data.target_file}`, "success");
+        } else {
+          addToast("Proposed patch and validation test synthesized successfully.", "success");
+        }
       } else {
         addToast(data?.error || "Fix generation failed.", "error");
       }
@@ -95,7 +111,8 @@ export default function AutonomousFix() {
 
       if (res?.success) {
         setApplied(true);
-        addToast("Fix verified and successfully applied to codebase.", "success");
+        setAppliedInfo(res);
+        addToast(res?.message || "Fix successfully written to cloned repo file.", "success");
       } else {
         addToast(res?.error || "Failed to apply fix", "error");
       }
@@ -103,6 +120,32 @@ export default function AutonomousFix() {
       addToast(err.message || "Failed to apply fix", "error");
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handleRollback = async () => {
+    if (!activeRepo) return;
+
+    setRollingBack(true);
+    try {
+      const res = await rollbackFix({
+        repository_name: activeRepo.name,
+        repository_path: activeRepo.path || activeRepo.name,
+        file_path: filePath.trim(),
+        original_code: result?.raw_data?.original_code,
+      });
+
+      if (res?.success) {
+        setApplied(false);
+        setAppliedInfo(null);
+        addToast(res?.message || "File restored from backup successfully.", "info");
+      } else {
+        addToast(res?.error || "Failed to rollback file.", "error");
+      }
+    } catch (err) {
+      addToast(err.message || "Failed to rollback file.", "error");
+    } finally {
+      setRollingBack(false);
     }
   };
 
@@ -215,16 +258,26 @@ export default function AutonomousFix() {
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", color: "var(--text-main)", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={autoApply}
+                onChange={(e) => setAutoApply(e.target.checked)}
+                style={{ accentColor: "var(--primary)", width: "16px", height: "16px", cursor: "pointer" }}
+              />
+              <span><strong>Auto-update cloned repository code</strong> immediately upon synthesis</span>
+            </label>
+
             <button
               type="submit"
-              className="btn btn-primary btn-lg"
+              className={`btn btn-primary btn-lg ${loading ? "btn-loading" : ""}`}
               disabled={loading || !filePath.trim() || !problem.trim()}
             >
               {loading ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Synthesizing Patch & Validation...</span>
+                  <ButtonSpinner size={16} />
+                  <span>Synthesizing Patch with Ollama...</span>
                 </>
               ) : (
                 <>
@@ -236,6 +289,23 @@ export default function AutonomousFix() {
           </div>
         </form>
       </div>
+
+      {/* Loading Progress State */}
+      {loading && (
+        <div className="card" style={{ padding: "40px", display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+          <PremiumLoader
+            size="md"
+            title="Synthesizing Autonomous Fix with Local Ollama"
+            subtitle={`Analyzing ${filePath} and applying local LLM repair with verification testing...`}
+            icon={Wrench}
+            steps={[
+              { label: "Inspecting Target Source File & AST Signatures", icon: FileCode },
+              { label: "Prompting Local Ollama LLM for Safe Code Repair", icon: Sparkles },
+              { label: "Validating Syntax Invariants & Regression Tests", icon: CheckCircle2 },
+            ]}
+          />
+        </div>
+      )}
 
       {/* Generated Patch & Diff Review Section */}
       {result && (
@@ -252,28 +322,76 @@ export default function AutonomousFix() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 {applied ? (
-                  <span className="badge badge-success" style={{ padding: "6px 12px", fontSize: "12.5px" }}>
-                    <CheckCircle2 size={14} /> Fix Applied to Workspace
-                  </span>
+                  <>
+                    <span className="badge badge-success" style={{ padding: "6px 12px", fontSize: "12.5px" }}>
+                      <CheckCircle2 size={14} /> Updated in Cloned Repo
+                    </span>
+                    <button
+                      className={`btn btn-secondary btn-sm ${rollingBack ? "btn-loading" : ""}`}
+                      onClick={handleRollback}
+                      disabled={rollingBack}
+                      title="Undo changes and restore original code from safety backup"
+                    >
+                      {rollingBack ? <ButtonSpinner size={13} /> : <RotateCcw size={13} />}
+                      <span>Rollback Fix</span>
+                    </button>
+                  </>
                 ) : (
                   <button
-                    className="btn btn-primary btn-lg"
+                    className={`btn btn-primary btn-lg ${applying ? "btn-loading" : ""}`}
                     onClick={handleApplyFix}
                     disabled={applying}
                   >
-                    {applying ? <Loader2 size={15} className="animate-spin" /> : <GitCommit size={15} />}
+                    {applying ? <ButtonSpinner size={15} /> : <GitCommit size={15} />}
                     <span>{applying ? "Applying Patch..." : "Approve & Apply Fix"}</span>
                   </button>
                 )}
               </div>
             </div>
 
+            {/* Live On Disk Confirmation Banner */}
+            {applied && (
+              <div
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--success) 35%, transparent)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "12px 16px",
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <ShieldCheck size={20} color="var(--success)" style={{ flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "13.5px", color: "var(--text-main)" }}>
+                      Source Code Successfully Written to Cloned Repository!
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", fontFamily: "JetBrains Mono", marginTop: "2px" }}>
+                      Disk Path: {appliedInfo?.disk_path || appliedInfo?.file || filePath}
+                    </div>
+                  </div>
+                </div>
+                <span className="badge badge-success" style={{ fontSize: "11px" }}>
+                  Live on Disk (Working Tree)
+                </span>
+              </div>
+            )}
+
             {/* Diff Viewer Component */}
             <DiffViewer
-              original={result.raw_data?.original_code || "// Original source code"}
-              modified={result.raw_data?.patched_code || "// Patched source code"}
+              diff={result.diff || result.raw_data?.diff}
+              originalCode={result.raw_data?.original_code}
+              patchedCode={result.raw_data?.patched_code}
+              filePath={filePath}
+              riskLevel={result.status === "VALIDATED" ? "LOW" : "MEDIUM"}
+              syntaxValid={result.status === "VALIDATED"}
             />
           </div>
         </div>

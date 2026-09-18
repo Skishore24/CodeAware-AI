@@ -11,6 +11,7 @@ import {
   Users,
   Settings as SettingsIcon,
   Menu,
+  GitBranch,
 } from "lucide-react";
 import { useRepo } from "../../context/RepoContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -110,7 +111,6 @@ export default function Header({ onOpenPalette, onToggleMobileSidebar }) {
             <span className="search-prompt-text">Search code, switch repos, or run commands...</span>
             <span className="search-prompt-short">Search...</span>
           </div>
-          <span className="header-kbd">⌘K</span>
         </button>
       </div>
 
@@ -130,6 +130,26 @@ export default function Header({ onOpenPalette, onToggleMobileSidebar }) {
             </span>
           )}
         </div>
+
+        {/* GitHub-Style Branch Chip */}
+        {activeRepo && (
+          <div
+            className="header-repo-chip"
+            onClick={() => navigate("/commits")}
+            style={{
+              backgroundColor: "var(--primary-light)",
+              borderColor: "var(--primary-border)",
+              color: "var(--primary-text)",
+              cursor: "pointer",
+            }}
+            title="View Git branches and commit history like GitHub"
+          >
+            <GitBranch size={13} color="var(--primary)" />
+            <span style={{ fontFamily: "JetBrains Mono, monospace", fontWeight: 700 }}>
+              {activeRepo.default_branch || "main"}
+            </span>
+          </div>
+        )}
 
         {/* Theme Toggle (Light / Dark) */}
         <button

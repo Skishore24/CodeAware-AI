@@ -101,7 +101,7 @@ class SecurityAgent(BaseAgent):
             "id": "SEC-010",
             "type": "insecure_http_url",
             "severity": "LOW",
-            "pattern": r"http://(?!localhost|127\.0\.0\.1|0\.0\.0\.0)[A-Za-z0-9\.\-]+",
+            "pattern": r"http://(?!localhost|127\.0\.0\.1|0\.0\.0\.0|www\.w3\.org|schemas\.xmlsoap\.org|schemas\.microsoft\.com)[A-Za-z0-9\.\-]+",
             "message": "Insecure HTTP protocol used instead of encrypted HTTPS transport.",
             "recommendation": "Upgrade plaintext HTTP endpoints to HTTPS."
         }
@@ -213,14 +213,21 @@ class SecurityAgent(BaseAgent):
             for rule in self.SECURITY_RULES:
                 match = re.search(rule["pattern"], line, re.IGNORECASE)
                 if match:
+                    start_ctx = max(0, line_num - 3)
+                    end_ctx = min(len(lines), line_num + 3)
+                    context_snippet = "\n".join(lines[start_ctx:end_ctx])
                     findings.append({
                         "id": rule["id"],
                         "type": rule["type"],
                         "severity": rule["severity"],
                         "file": file_path,
                         "line": line_num,
+                        "line_number": line_num,
                         "message": rule["message"],
                         "recommendation": rule["recommendation"],
-                        "evidence": sline[:120],
+                        "evidence": sline[:140],
+                        "code": sline,
+                        "snippet": context_snippet,
+                        "context_start_line": start_ctx + 1,
                     })
         return findings

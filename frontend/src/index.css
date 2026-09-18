@@ -834,6 +834,92 @@ button, input, select, textarea {
   border-radius: var(--radius-lg);
 }
 
+/* =========================================================
+   Premium Button Loading State & Shimmer
+   ========================================================= */
+.btn-loading,
+.btn.loading {
+  position: relative !important;
+  overflow: hidden !important;
+  cursor: wait !important;
+  opacity: 0.95 !important;
+  pointer-events: none !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn-primary.btn-loading,
+.btn-primary.loading {
+  background: linear-gradient(135deg, #4338CA 0%, #6366F1 50%, #8B5CF6 100%) !important;
+  box-shadow: 0 0 18px rgba(99, 102, 241, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.btn-secondary.btn-loading,
+.btn-secondary.loading {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.3) !important;
+  background-color: var(--bg-surface-hover) !important;
+}
+
+/* Ambient liquid shimmer wave inside loading button */
+.btn-loading::before,
+.btn.loading::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 100%
+  );
+  animation: btnSweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes btnSweep {
+  0% { transform: translateX(-60%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes spinReverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* Micro dual-ring spinner for buttons */
+.btn-spinner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-spinner-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+  animation: spin 0.75s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+.btn-spinner-ring-inner {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  border-bottom-color: currentColor;
+  opacity: 0.65;
+  animation: spinReverse 0.55s linear infinite;
+}
+
+
 /* ---------------------------------------------------------
    Badges & Pills
    --------------------------------------------------------- */
@@ -2088,8 +2174,18 @@ button, input, select, textarea {
 
 
 /* =========================================================
-   Universal Keyframe Animations
+   Universal Keyframe Animations & Loaders
    ========================================================= */
+.spin,
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @keyframes rotateClockwise {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -2112,17 +2208,155 @@ button, input, select, textarea {
 
 @keyframes pulseGlow {
   0% { transform: scale(0.9); opacity: 0.15; }
-  100% { transform: scale(1.15); opacity: 0.35; }
+  100% { transform: scale(1.18); opacity: 0.38; }
 }
 
 @keyframes pulseDot {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 0.35; transform: scale(0.75); }
 }
 
 @keyframes progressShimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(200%); }
+}
+
+@keyframes orbitSat1 {
+  0% {
+    transform: rotate(0deg) translateX(46px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(46px) rotate(-360deg);
+  }
+}
+
+@keyframes orbitSat2 {
+  0% {
+    transform: rotate(180deg) translateX(46px) rotate(-180deg);
+  }
+  100% {
+    transform: rotate(540deg) translateX(46px) rotate(-540deg);
+  }
+}
+
+@keyframes corePulse {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 16px rgba(79, 70, 229, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+  }
+  100% {
+    transform: scale(1.06);
+    box-shadow: 0 0 32px rgba(99, 102, 241, 0.8), inset 0 1px 3px rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* Skeleton Loading Shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-muted);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 35%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.08) 65%,
+    transparent 100%
+  );
+  animation: skeletonSweep 1.6s ease-in-out infinite;
+}
+
+[data-theme="light"] .skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.04) 35%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 65%,
+    transparent 100%
+  );
+}
+
+@keyframes skeletonSweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Gyroscopic 3D Orbital Loader Styles */
+.orbital-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  user-select: none;
+}
+
+.orbital-gyro-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orbital-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.orbital-ring-1 {
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-bottom-color: rgba(99, 102, 241, 0.25);
+  animation: rotateClockwise 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.35);
+}
+
+.orbital-ring-2 {
+  border: 1.5px dashed var(--purple);
+  opacity: 0.7;
+  animation: rotateCounterClockwise 3.6s linear infinite;
+}
+
+.orbital-ring-3 {
+  border: 2px solid transparent;
+  border-left-color: #06B6D4;
+  border-right-color: transparent;
+  animation: rotateClockwise 1.8s ease-in-out infinite alternate;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+}
+
+.orbital-core-orb {
+  border-radius: 50%;
+  background: var(--primary-gradient);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px rgba(79, 70, 229, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+  animation: corePulse 2s ease-in-out infinite alternate;
+  z-index: 2;
+}
+
+.orbital-beacon {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38BDF8;
+  box-shadow: 0 0 8px #38BDF8;
+  top: 0;
+  left: 50%;
+  margin-left: -3.5px;
 }
 
 @keyframes floatTag1 {
@@ -2140,4 +2374,5 @@ button, input, select, textarea {
     display: none;
   }
 }
+
 

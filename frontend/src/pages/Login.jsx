@@ -11,7 +11,6 @@ import {
   EyeOff,
   Sparkles,
   CheckCircle2,
-  KeyRound,
   Search,
   Loader2,
   GitGraph,
@@ -80,22 +79,6 @@ export default function Login() {
     }
   };
 
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    try {
-      const res = await login("alex.morgan@codeaware.ai", "demo12345");
-      if (res.success) {
-        addToast("Signed in to Demo Workspace.", "success");
-        navigate("/", { replace: true });
-      } else {
-        addToast(res.error || "Demo access failed.", "error");
-      }
-    } catch (err) {
-      addToast(err.message || "Demo access failed.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const features = [
     {
@@ -208,37 +191,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Quick Demo Access Bar */}
-          <div
-            onClick={loading ? undefined : handleDemoLogin}
-            className="card card-interactive"
-            style={{
-              padding: "12px 16px",
-              backgroundColor: "var(--primary-light)",
-              borderColor: "var(--primary-border)",
-              marginBottom: "20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              opacity: loading ? 0.7 : 1,
-              pointerEvents: loading ? "none" : "auto",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={{ width: "30px", height: "30px", borderRadius: "var(--radius-md)", backgroundColor: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <KeyRound size={15} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--primary-text)" }}>
-                  Quick Demo Access (1-Click)
-                </div>
-                <div style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-                  Instant sign in with sample codebases & demo projects
-                </div>
-              </div>
-            </div>
-            {loading ? <Loader2 size={16} className="spin" color="var(--primary)" /> : <ArrowRight size={16} color="var(--primary)" />}
-          </div>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {isRegister && (

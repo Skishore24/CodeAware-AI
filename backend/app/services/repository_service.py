@@ -161,7 +161,12 @@ class RepositoryService:
             raise ValueError("Target repository directory escapes the workspace.")
 
         if not target_dir.exists():
-            raise FileNotFoundError(f"Repository '{sanitized_name}' does not exist in workspace.")
+            logger.info(f"Repository '{sanitized_name}' was not found on disk (already removed).")
+            return {
+                "success": True,
+                "message": f"Repository '{sanitized_name}' was already removed from workspace.",
+                "repository_name": sanitized_name,
+            }
 
         try:
             robust_rmtree(target_dir)

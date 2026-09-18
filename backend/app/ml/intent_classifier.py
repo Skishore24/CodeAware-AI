@@ -1,7 +1,18 @@
-from typing import Dict, List, Tuple, Any, Optional
+import math
+import os
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
+from typing import Dict, List, Tuple, Any, Optional
+
+_USE_NATIVE = os.getenv("CODEAWARE_NATIVE_TFIDF", "true").lower() in ("1", "true", "yes")
+
+_SKLEARN_AVAILABLE = False
+if not _USE_NATIVE:
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.linear_model import LogisticRegression
+        _SKLEARN_AVAILABLE = True
+    except (ImportError, OSError, Exception):
+        _SKLEARN_AVAILABLE = False
 
 
 class IntentClassifier:
@@ -78,14 +89,26 @@ class IntentClassifier:
     }
 
     def __init__(self):
-        self.vectorizer = TfidfVectorizer(
-            lowercase=True,
-            ngram_range=(1, 2),
-            token_pattern=r"(?u)\b[\w\-_/.]+\b"
-        )
-        self.model = LogisticRegression(max_iter=1000, C=1.0)
         self.is_trained = False
-        self._train_initial_model()
+        self.vectorizer = None
+        self.model = None
+        self.native_idf: Dict[str, float] = {}
+        self.intent_centroids: Dict[str, Dict[str, float]] = {}
+
+        if _SKLEARN_AVAILABLE:
+            try:
+                self.vectorizer = TfidfVectorizer(
+                    lowercase=True,
+                    ngram_range=(1, 2),
+                    token_pattern=r"(?u)\b[\w\-_/.]+\b"
+                )
+                self.model = LogisticRegression(max_iter=1000, C=1.0)
+                self._train_initial_model()
+            except Exception:
+                self.is_trained = False
+
+        if not self.is_trained:
+            self._train_native_model()
 
     def _training_data(self) -> Tuple[List[str], List[str]]:
         data: List[Tuple[str, str]] = [
@@ -205,6 +228,46 @@ class IntentClassifier:
         self.model.fit(X, labels)
         self.is_trained = True
 
+    def _train_native_model(self):
+        texts, labels = self._training_data()
+        n_docs = len(texts)
+        df: Dict[str, int] = {}
+        doc_term_counts: List[Dict[str, int]] = []
+
+        for text in texts:
+            words = re.findall(r"(?u)\b[\w\-_/.]+\b", text.lower())
+            tokens = list(words)
+            for i in range(len(words) - 1):
+                tokens.append(f"{words[i]} {words[i+1]}")
+
+            counts: Dict[str, int] = {}
+            for t in tokens:
+                counts[t] = counts.get(t, 0) + 1
+            for t in counts:
+                df[t] = df.get(t, 0) + 1
+            doc_term_counts.append(counts)
+
+        self.native_idf = {
+            t: math.log((1 + n_docs) / (1 + count)) + 1.0
+            for t, count in df.items()
+        }
+
+        self.intent_centroids = {intent: {} for intent in self.INTENTS}
+        for label, counts in zip(labels, doc_term_counts):
+            vec: Dict[str, float] = {t: c * self.native_idf[t] for t, c in counts.items()}
+            norm = math.sqrt(sum(v * v for v in vec.values()))
+            if norm > 0:
+                for t, v in vec.items():
+                    self.intent_centroids[label][t] = self.intent_centroids[label].get(t, 0.0) + (v / norm)
+
+        for intent in self.INTENTS:
+            c_vec = self.intent_centroids[intent]
+            c_norm = math.sqrt(sum(v * v for v in c_vec.values()))
+            if c_norm > 0:
+                self.intent_centroids[intent] = {t: v / c_norm for t, v in c_vec.items()}
+
+        self.is_trained = True
+
     def predict(self, text: str) -> Dict[str, Any]:
         """
         Classify text and extract primary & secondary intents with confidence and keyword boost.
@@ -230,7 +293,7 @@ class IntentClassifier:
 
         # ML Model Scoring
         ml_scores: Dict[str, float] = {}
-        if self.is_trained:
+        if self.model is not None and self.vectorizer is not None and self.is_trained:
             try:
                 X = self.vectorizer.transform([cleaned])
                 probs = self.model.predict_proba(X)[0]
@@ -239,6 +302,33 @@ class IntentClassifier:
                     ml_scores[cls] = float(prob)
             except Exception:
                 pass
+
+        if not ml_scores and self.intent_centroids:
+            words = re.findall(r"(?u)\b[\w\-_/.]+\b", lower_text)
+            tokens = list(words)
+            for i in range(len(words) - 1):
+                tokens.append(f"{words[i]} {words[i+1]}")
+
+            q_counts: Dict[str, int] = {}
+            for t in tokens:
+                q_counts[t] = q_counts.get(t, 0) + 1
+
+            q_vec = {t: c * self.native_idf.get(t, 1.0) for t, c in q_counts.items() if t in self.native_idf}
+            q_norm = math.sqrt(sum(v * v for v in q_vec.values()))
+            if q_norm > 0:
+                q_vec = {t: v / q_norm for t, v in q_vec.items()}
+                raw_sims = {}
+                for intent in self.INTENTS:
+                    c_vec = self.intent_centroids.get(intent, {})
+                    sim = sum(q_vec[t] * c_vec[t] for t in q_vec if t in c_vec)
+                    raw_sims[intent] = max(0.0, sim)
+                total = sum(raw_sims.values())
+                if total > 0:
+                    for intent in self.INTENTS:
+                        ml_scores[intent] = raw_sims[intent] / total
+                else:
+                    for intent in self.INTENTS:
+                        ml_scores[intent] = 1.0 / len(self.INTENTS)
 
         # Combine ML and Keyword Scores
         combined_scores: Dict[str, float] = {}

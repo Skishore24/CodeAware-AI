@@ -8,6 +8,10 @@ import {
   Loader2,
   Search,
   Wrench,
+  MapPin,
+  FileCode,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useRepo } from "../context/RepoContext";
 import { runSecurityScan } from "../api/security";
@@ -16,6 +20,8 @@ import SourceViewer from "../components/SourceViewer";
 import { useNavigate } from "react-router-dom";
 import EmptyState from "../components/feedback/EmptyState";
 import { CardSkeleton } from "../components/feedback/Skeleton";
+import PremiumLoader from "../components/common/PremiumLoader";
+import ButtonSpinner from "../components/common/ButtonSpinner";
 
 export default function SecurityDashboard() {
   const navigate = useNavigate();
@@ -27,6 +33,7 @@ export default function SecurityDashboard() {
   const [selectedFinding, setSelectedFinding] = useState(null);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const handleRunScan = async () => {
     if (!activeRepo) return;
@@ -67,18 +74,19 @@ export default function SecurityDashboard() {
 
   const findings = securityData?.findings || [];
   const rawData = securityData?.raw_data || {};
-  const criticalCount = rawData.critical || findings.filter((f) => f.severity === "CRITICAL").length;
-  const highCount = rawData.high || findings.filter((f) => f.severity === "HIGH").length;
-  const mediumCount = rawData.medium || findings.filter((f) => f.severity === "MEDIUM").length;
-  const lowCount = rawData.low || findings.filter((f) => f.severity === "LOW").length;
+  const criticalCount = rawData.critical ?? findings.filter((f) => f.severity === "CRITICAL").length;
+  const highCount = rawData.high ?? findings.filter((f) => f.severity === "HIGH").length;
+  const mediumCount = rawData.medium ?? findings.filter((f) => f.severity === "MEDIUM").length;
+  const lowCount = rawData.low ?? findings.filter((f) => f.severity === "LOW").length;
 
   const filteredFindings = findings.filter((f) => {
     const matchesSeverity = severityFilter === "all" || f.severity === severityFilter;
     const matchesSearch =
       !searchQuery.trim() ||
       (f.message || f.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.file || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.type || f.category || "").toLowerCase().includes(searchQuery.toLowerCase());
+      (f.file || f.file_path || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (f.type || f.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (f.evidence || f.code || "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSeverity && matchesSearch;
   });
 
@@ -95,6 +103,13 @@ export default function SecurityDashboard() {
     }
   };
 
+  const handleCopyOffendingCode = (codeStr) => {
+    if (!codeStr) return;
+    navigator.clipboard.writeText(codeStr);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
   return (
     <div className="page-container">
       {/* Header */}
@@ -108,8 +123,12 @@ export default function SecurityDashboard() {
           </p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={handleRunScan} disabled={loading}>
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          <button
+            className={`btn btn-primary ${loading ? "btn-loading" : ""}`}
+            onClick={handleRunScan}
+            disabled={loading}
+          >
+            {loading ? <ButtonSpinner size={15} /> : <RefreshCw size={15} />}
             <span>{loading ? "Auditing Codebase..." : "Re-Scan Security"}</span>
           </button>
         </div>
@@ -165,7 +184,7 @@ export default function SecurityDashboard() {
           <input
             type="text"
             className="input"
-            placeholder="Search findings..."
+            placeholder="Search findings or files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ paddingLeft: "30px", fontSize: "12.5px" }}
@@ -176,10 +195,18 @@ export default function SecurityDashboard() {
 
       {/* Main Content Split */}
       {loading ? (
-        <div className="grid-3">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
+        <div className="card" style={{ padding: "40px", display: "flex", justifyContent: "center" }}>
+          <PremiumLoader
+            size="lg"
+            title="Scanning Codebase for Security Vulnerabilities"
+            subtitle={`Scanning ${activeRepo?.name || 'repository'} against OWASP Top 10, hardcoded secrets, and unsafe execution...`}
+            icon={ShieldAlert}
+            steps={[
+              { label: "Checking Hardcoded API Keys & Auth Secrets", icon: ShieldAlert },
+              { label: "Auditing SQL Injection & Command Execution", icon: AlertOctagon },
+              { label: "Validating CORS, Insecure Transports & Deprecations", icon: ShieldCheck },
+            ]}
+          />
         </div>
       ) : findings.length === 0 ? (
         <div className="card" style={{ padding: "48px", textAlign: "center", color: "var(--success)" }}>
@@ -190,11 +217,12 @@ export default function SecurityDashboard() {
           </p>
         </div>
       ) : (
-        <div className="responsive-split-view">
+        <div className="responsive-split-view" style={{ flex: 1, minHeight: 0, alignItems: "stretch" }}>
           {/* Findings List */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "600px", overflowY: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "calc(100vh - 280px)", minHeight: "450px", overflowY: "auto", paddingRight: "4px" }}>
             {filteredFindings.map((finding, idx) => {
               const isSelected = selectedFinding === finding;
+              const findingLine = finding.line || finding.line_number || "N/A";
               return (
                 <div
                   key={idx}
@@ -204,12 +232,13 @@ export default function SecurityDashboard() {
                     padding: "14px",
                     borderColor: isSelected ? "var(--primary)" : "var(--border-color)",
                     backgroundColor: isSelected ? "var(--primary-light)" : "var(--bg-card)",
+                    cursor: "pointer",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
                     {getSeverityBadge(finding.severity)}
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "JetBrains Mono" }}>
-                      Line {finding.line || finding.line_number || "N/A"}
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", display: "flex", alignItems: "center", gap: "3px" }}>
+                      <MapPin size={11} /> Line {findingLine}
                     </span>
                   </div>
 
@@ -220,23 +249,45 @@ export default function SecurityDashboard() {
                   <div style={{ fontSize: "11.5px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", wordBreak: "break-all" }}>
                     {finding.file || finding.file_path}
                   </div>
+
+                  {(finding.evidence || finding.code) && (
+                    <div
+                      style={{
+                        marginTop: "6px",
+                        padding: "4px 8px",
+                        backgroundColor: "#0B0F19",
+                        borderRadius: "4px",
+                        fontSize: "11px",
+                        color: "#94A3B8",
+                        fontFamily: "'JetBrains Mono', monospace",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        borderLeft: "2px solid var(--primary)",
+                      }}
+                    >
+                      {finding.evidence || finding.code}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* Finding Details & Source Viewer */}
-          <div className="card" style={{ padding: "var(--space-5)", display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="card" style={{ padding: "var(--space-5)", display: "flex", flexDirection: "column", gap: "16px", maxHeight: "calc(100vh - 280px)", minHeight: "450px", overflowY: "auto" }}>
             {selectedFinding ? (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
                   <div>
                     <div style={{ marginBottom: "6px" }}>{getSeverityBadge(selectedFinding.severity)}</div>
-                    <h3 style={{ fontSize: "16px", fontWeight: 800 }}>
+                    <h3 style={{ fontSize: "17px", fontWeight: 800 }}>
                       {selectedFinding.type || selectedFinding.message}
                     </h3>
-                    <div style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", marginTop: "2px" }}>
-                      {selectedFinding.file || selectedFinding.file_path} {selectedFinding.line ? `:${selectedFinding.line}` : ""}
+                    <div style={{ fontSize: "12.5px", color: "var(--text-muted)", fontFamily: "JetBrains Mono", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <FileCode size={14} />
+                      <span>{selectedFinding.file || selectedFinding.file_path}</span>
+                      <span style={{ color: "var(--primary)", fontWeight: 700 }}>: Line {selectedFinding.line || selectedFinding.line_number}</span>
                     </div>
                   </div>
 
@@ -246,21 +297,117 @@ export default function SecurityDashboard() {
                       navigate("/autonomous", {
                         state: {
                           targetFile: selectedFinding.file || selectedFinding.file_path,
-                          targetProblem: `Fix security issue: ${selectedFinding.message || selectedFinding.type}. ${selectedFinding.recommendation || ''}`,
+                          targetProblem: `Fix security issue at line ${selectedFinding.line || selectedFinding.line_number} in ${selectedFinding.file || selectedFinding.file_path}: ${selectedFinding.message || selectedFinding.type}. Code: ${selectedFinding.evidence || selectedFinding.code || ''}. ${selectedFinding.recommendation || ''}`,
                         },
                       })
                     }
                   >
                     <Wrench size={13} />
-                    <span>Generate Fix</span>
+                    <span>Fix with Autonomous Agent</span>
                   </button>
+                </div>
+
+                {/* Prominent Exact Location & Offending Code Card */}
+                <div
+                  style={{
+                    padding: "14px",
+                    backgroundColor:
+                      selectedFinding.severity === "CRITICAL" || selectedFinding.severity === "HIGH"
+                        ? "rgba(239, 68, 68, 0.08)"
+                        : "rgba(245, 158, 11, 0.08)",
+                    borderRadius: "var(--radius-md)",
+                    border: `1px solid ${
+                      selectedFinding.severity === "CRITICAL" || selectedFinding.severity === "HIGH"
+                        ? "rgba(239, 68, 68, 0.3)"
+                        : "rgba(245, 158, 11, 0.3)"
+                    }`,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color:
+                          selectedFinding.severity === "CRITICAL" || selectedFinding.severity === "HIGH"
+                            ? "var(--error)"
+                            : "var(--warning)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <AlertTriangle size={14} /> Exact Error Location In Repo
+                    </span>
+
+                    <span
+                      style={{
+                        fontSize: "11.5px",
+                        fontFamily: "'JetBrains Mono', monospace",
+                        color: "var(--text-main)",
+                        backgroundColor: "var(--bg-card)",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        border: "1px solid var(--border-color)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <MapPin size={11} color="var(--primary)" />
+                      {activeRepo.name} &gt; {selectedFinding.file || selectedFinding.file_path} : <strong>Line {selectedFinding.line || selectedFinding.line_number}</strong>
+                    </span>
+                  </div>
+
+                  {(selectedFinding.evidence || selectedFinding.code) && (
+                    <div style={{ marginTop: "8px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)" }}>
+                          Offending Code on Line {selectedFinding.line || selectedFinding.line_number}:
+                        </span>
+                        <button
+                          onClick={() => handleCopyOffendingCode(selectedFinding.evidence || selectedFinding.code)}
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: "1px 6px", fontSize: "10.5px", height: "auto" }}
+                        >
+                          {copiedCode ? <Check size={11} color="#10B981" /> : <Copy size={11} />}
+                          <span>{copiedCode ? "Copied" : "Copy"}</span>
+                        </button>
+                      </div>
+                      <pre
+                        style={{
+                          margin: 0,
+                          padding: "10px 14px",
+                          backgroundColor: "#0B0F19",
+                          color:
+                            selectedFinding.severity === "CRITICAL" || selectedFinding.severity === "HIGH"
+                              ? "#FCA5A5"
+                              : "#FDE68A",
+                          borderRadius: "6px",
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: "12.5px",
+                          overflowX: "auto",
+                          borderLeft: `4px solid ${
+                            selectedFinding.severity === "CRITICAL" || selectedFinding.severity === "HIGH"
+                              ? "#EF4444"
+                              : "#F59E0B"
+                          }`,
+                          lineHeight: "1.5",
+                        }}
+                      >
+                        <code>{selectedFinding.evidence || selectedFinding.code}</code>
+                      </pre>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ padding: "12px", backgroundColor: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
                   <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>
                     Why It Matters
                   </div>
-                  <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                  <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: "1.5", margin: 0 }}>
                     {selectedFinding.message || "Vulnerabilities of this nature can lead to unauthorized code execution, data exposure, or privilege escalation."}
                   </p>
                 </div>
@@ -270,18 +417,21 @@ export default function SecurityDashboard() {
                     <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--success-text)", textTransform: "uppercase", marginBottom: "4px" }}>
                       Recommended Remediation
                     </div>
-                    <p style={{ fontSize: "13px", color: "var(--success-text)", lineHeight: "1.5" }}>
+                    <p style={{ fontSize: "13px", color: "var(--success-text)", lineHeight: "1.5", margin: 0 }}>
                       {selectedFinding.recommendation}
                     </p>
                   </div>
                 )}
 
-                {/* Source Viewer */}
-                <div style={{ flex: 1, minHeight: "220px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+                {/* Source Viewer with Auto-Scroll & Error Highlighting */}
+                <div style={{ flex: 1, minHeight: "260px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
                   <SourceViewer
                     repositoryName={activeRepo.name}
                     filePath={selectedFinding.file || selectedFinding.file_path}
                     targetLine={selectedFinding.line || selectedFinding.line_number}
+                    highlightLines={[Number(selectedFinding.line || selectedFinding.line_number || 1)]}
+                    severity={selectedFinding.severity}
+                    issueMessage={selectedFinding.message || selectedFinding.type}
                   />
                 </div>
               </>

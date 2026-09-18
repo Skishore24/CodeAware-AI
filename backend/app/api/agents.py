@@ -6,8 +6,11 @@ from pydantic import BaseModel
 from app.agents.orchestrator import (
     CodeAwareOrchestrator
 )
+from app.core.logging import get_logger
 from app.db.database import SessionLocal
 from app.db.models import ChatMessage
+
+logger = get_logger("app.api.agents")
 
 
 router = APIRouter(
@@ -56,7 +59,8 @@ def run_agent(
                 )
                 db.add(assistant_msg)
                 db.commit()
-        except Exception:
-            pass
+                logger.info(f"Persisted agent conversation to MySQL chat_messages for {repo_name}")
+        except Exception as dberr:
+            logger.error(f"Failed to persist agent conversation to MySQL: {dberr}", exc_info=True)
 
     return res

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 
 const ToastContext = createContext(null);
@@ -6,7 +6,28 @@ const ToastContext = createContext(null);
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((type, title, message) => {
+  const addToast = useCallback((first, second, third) => {
+    let type = "info";
+    let title = "";
+    let message = "";
+
+    const validTypes = ["success", "error", "warning", "info"];
+    if (typeof first === "string" && validTypes.includes(first.toLowerCase())) {
+      // Called as addToast("success", "Title", "Optional message")
+      type = first.toLowerCase();
+      title = second || "";
+      message = third || "";
+    } else if (typeof second === "string" && validTypes.includes(second.toLowerCase())) {
+      // Called as addToast("Title or message", "success", "Optional extra info")
+      type = second.toLowerCase();
+      title = first || "";
+      message = third || "";
+    } else {
+      title = first || "";
+      type = "info";
+      message = (typeof second === "string" ? second : "") || (typeof third === "string" ? third : "");
+    }
+
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, type, title, message }]);
     setTimeout(() => {
@@ -27,8 +48,17 @@ export function ToastProvider({ children }) {
     }
   };
 
+  // contextValue works both as a function (addToast) and as an object ({ addToast, dismiss, toast })
+  const contextValue = useMemo(() => {
+    const fn = (...args) => addToast(...args);
+    fn.addToast = addToast;
+    fn.dismiss = dismiss;
+    fn.toast = addToast;
+    return fn;
+  }, [addToast, dismiss]);
+
   return (
-    <ToastContext.Provider value={addToast}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <div className="toast-container">
         {toasts.map((t) => (
@@ -58,4 +88,16 @@ export function ToastProvider({ children }) {
   );
 }
 
-export const useToast = () => useContext(ToastContext);
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) {
+    // Return a fallback no-op that doesn't crash if rendered outside provider
+    const fallback = () => {};
+    fallback.addToast = () => {};
+    fallback.dismiss = () => {};
+    fallback.toast = () => {};
+    return fallback;
+  }
+  return context;
+};
+

@@ -94,15 +94,15 @@ export default function Repositories() {
       const res = await deleteRepository(repoName);
       if (res?.success) {
         addToast(`Repository "${repoName}" removed successfully.`, "success");
-        setRepoToDelete(null);
-        await refreshRepositories();
       } else {
-        addToast(res?.error || "Failed to remove repository.", "error");
+        addToast(res?.message || res?.error || "Failed to remove repository.", "error");
       }
     } catch (err) {
       addToast(err.message || "Failed to remove repository.", "error");
     } finally {
       setDeleting(false);
+      setRepoToDelete(null);
+      await refreshRepositories();
     }
   };
 

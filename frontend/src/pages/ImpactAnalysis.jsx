@@ -13,6 +13,8 @@ import { useRepo } from "../context/RepoContext";
 import { getImpact } from "../api/graph";
 import { useToast } from "../components/Toast";
 import EmptyState from "../components/feedback/EmptyState";
+import PremiumLoader from "../components/common/PremiumLoader";
+import ButtonSpinner from "../components/common/ButtonSpinner";
 
 export default function ImpactAnalysis() {
   const { activeRepo } = useRepo();
@@ -117,9 +119,13 @@ export default function ImpactAnalysis() {
             <Search size={15} color="var(--text-subtle)" style={{ position: "absolute", left: "12px", top: "13px" }} />
           </div>
 
-          <button type="submit" className="btn btn-primary btn-lg" disabled={loading || !symbol.trim()}>
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <GitFork size={16} />}
-            <span>Calculate Impact</span>
+          <button
+            type="submit"
+            className={`btn btn-primary btn-lg ${loading ? "btn-loading" : ""}`}
+            disabled={loading || !symbol.trim()}
+          >
+            {loading ? <ButtonSpinner size={16} /> : <GitFork size={16} />}
+            <span>{loading ? "Calculating Blast Radius..." : "Calculate Impact"}</span>
           </button>
         </form>
 
@@ -153,12 +159,18 @@ export default function ImpactAnalysis() {
 
       {/* Impact Results */}
       {loading ? (
-        <div className="card" style={{ padding: "48px", textAlign: "center" }}>
-          <Loader2 size={32} className="animate-spin" color="var(--primary)" style={{ margin: "0 auto 12px" }} />
-          <h3 style={{ fontSize: "15px", fontWeight: 700 }}>Calculating Dependency Blast Radius</h3>
-          <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "4px" }}>
-            Tracing cross-file references, callers, and affected endpoint routes...
-          </p>
+        <div className="card" style={{ padding: "36px", display: "flex", justifyContent: "center" }}>
+          <PremiumLoader
+            size="md"
+            title="Calculating Dependency Blast Radius"
+            subtitle="Tracing cross-file references, callers, and affected endpoint routes..."
+            icon={GitFork}
+            steps={[
+              { label: "Locating Symbol Declarations & Signatures", icon: FileCode },
+              { label: "Tracing Inbound References & Callers", icon: GitFork },
+              { label: "Evaluating Blast Radius & Risk Heuristics", icon: AlertTriangle },
+            ]}
+          />
         </div>
       ) : impactResult ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>

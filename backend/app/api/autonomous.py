@@ -4,9 +4,12 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 
 from app.services.autonomous_workflow import AutonomousWorkflow
+from app.core.logging import get_logger
 from app.db.database import SessionLocal
 from app.db.models import AutonomousFixRecord
 import datetime
+
+logger = get_logger("app.api.autonomous")
 
 
 router = APIRouter(
@@ -25,6 +28,8 @@ class AutonomousRequest(BaseModel):
     function_name: Optional[str] = None
     original_code: Optional[str] = None
     max_retries: int = Field(default=2, ge=0, le=5)
+    use_llm: bool = True
+    auto_apply: bool = False
 
 
 class ApprovalRequest(BaseModel):
@@ -36,6 +41,13 @@ class ApprovalRequest(BaseModel):
     branch_name: Optional[str] = "main"
     commit_message: str = "CodeAware: apply validated fix"
     approved: bool = True
+
+
+class RollbackRequest(BaseModel):
+    repository_path: Optional[str] = None
+    repository_name: Optional[str] = None
+    file_path: str
+    original_code: Optional[str] = None
 
 
 class PRRequest(BaseModel):
@@ -58,6 +70,7 @@ def run_autonomous_workflow(request: AutonomousRequest):
         if SessionLocal and res:
             try:
                 repo_name = request.repository_name or (Path(request.repository_path).name if request.repository_path else "default")
+                is_applied = bool(res.get("applied_to_repo"))
                 with SessionLocal() as db:
                     raw = res.get("raw_data", {})
                     fix_rec = AutonomousFixRecord(
@@ -67,15 +80,18 @@ def run_autonomous_workflow(request: AutonomousRequest):
                         original_code=raw.get("original_code", ""),
                         patched_code=raw.get("patched_code", ""),
                         validation_status="Verified" if res.get("success") else "Failed",
-                        is_applied=False,
+                        is_applied=is_applied,
+                        applied_at=datetime.datetime.now(datetime.timezone.utc) if is_applied else None,
                     )
                     db.add(fix_rec)
                     db.commit()
-            except Exception:
-                pass
+                    logger.info(f"Persisted AutonomousFixRecord id={fix_rec.id} (applied={is_applied}) for {repo_name} to MySQL")
+            except Exception as dberr:
+                logger.error(f"Failed to persist autonomous fix to MySQL: {dberr}", exc_info=True)
 
         return res
     except Exception as exc:
+        logger.error(f"Autonomous generation error: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -100,11 +116,35 @@ def approve_fix(request: ApprovalRequest):
                     )
                     if latest_fix:
                         latest_fix.is_applied = True
-                        latest_fix.applied_at = datetime.datetime.utcnow()
+                        latest_fix.applied_at = datetime.datetime.now(datetime.timezone.utc)
                         db.commit()
-            except Exception:
-                pass
+                        logger.info(f"Marked AutonomousFixRecord id={latest_fix.id} as applied in MySQL")
+            except Exception as dberr:
+                logger.error(f"Failed to mark autonomous fix applied in MySQL: {dberr}", exc_info=True)
 
+        return res
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/rollback")
+def rollback_fix(request: RollbackRequest):
+    try:
+        res = workflow.rollback(request.model_dump())
+        if SessionLocal and res.get("success"):
+            try:
+                with SessionLocal() as db:
+                    latest_fix = (
+                        db.query(AutonomousFixRecord)
+                        .filter(AutonomousFixRecord.file_path == request.file_path)
+                        .order_by(AutonomousFixRecord.id.desc())
+                        .first()
+                    )
+                    if latest_fix:
+                        latest_fix.is_applied = False
+                        db.commit()
+            except Exception as dberr:
+                logger.error(f"Failed to update rollback in MySQL: {dberr}", exc_info=True)
         return res
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

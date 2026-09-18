@@ -1,6 +1,12 @@
+import re
 from typing import Dict, List, Optional
 from app.rag.keyword_search import KeywordSearch
 from app.rag.vector_store import TFIDFVectorStore
+
+
+def re_split(text: str) -> List[str]:
+    return re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", text)
+
 
 
 class HybridRetriever:
@@ -73,8 +79,3 @@ class HybridRetriever:
 
         ranked.sort(key=lambda x: x["retrieval_score"], reverse=True)
         return ranked[:top_k]
-
-
-def re_split(text: str) -> List[str]:
-    import re
-    return re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", text)

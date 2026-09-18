@@ -21,12 +21,21 @@ import TestGenerator from "./pages/TestGenerator";
 import SecurityDashboard from "./pages/SecurityDashboard";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Bugs from "./pages/Bugs";
+import DeepAgentWorkspace from "./pages/DeepAgentWorkspace";
+import RepoWorkspace from "./pages/RepoWorkspace";
+import CommitsHistory from "./pages/CommitsHistory";
 import NotFound from "./pages/NotFound";
 
 function PageWrapper({ children }) {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
+    const mainContent = document.querySelector(".main-content");
+    if (mainContent) {
+      mainContent.scrollTop = 0;
+    }
   }, [pathname]);
   return <div className="page-enter">{children}</div>;
 }
@@ -103,14 +112,19 @@ export default function App() {
               <Routes>
                 {/* Authentication */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
                 {/* Authenticated Workspace Pages (with Sidebar & Header) */}
                 <Route path="/" element={<MainLayout><Dashboard /></MainLayout>} />
                 <Route path="/repos" element={<MainLayout><Repositories /></MainLayout>} />
+                <Route path="/repos/:repoId" element={<MainLayout><RepoWorkspace /></MainLayout>} />
+                <Route path="/commits" element={<MainLayout><CommitsHistory /></MainLayout>} />
                 <Route path="/search" element={<MainLayout><CodeSearch /></MainLayout>} />
                 <Route path="/review" element={<MainLayout><CodeReview /></MainLayout>} />
                 <Route path="/security" element={<MainLayout><SecurityDashboard /></MainLayout>} />
+                <Route path="/bugs" element={<MainLayout><Bugs /></MainLayout>} />
                 <Route path="/agent" element={<MainLayout><AgentChat /></MainLayout>} />
+                <Route path="/deep-agent" element={<MainLayout><DeepAgentWorkspace /></MainLayout>} />
                 <Route path="/graph" element={<MainLayout><CodeGraph /></MainLayout>} />
                 <Route path="/impact" element={<MainLayout><ImpactAnalysis /></MainLayout>} />
                 <Route path="/autonomous" element={<MainLayout><AutonomousFix /></MainLayout>} />
