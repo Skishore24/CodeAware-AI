@@ -42,6 +42,7 @@ from app.api.projects import router as projects_router
 from app.api.system import router as system_router
 from app.api.ollama import router as ollama_router
 from app.api.health import router as health_router
+from app.api.ml import router as ml_router
 
 setup_logging()
 logger = get_logger("app.main")
@@ -138,6 +139,7 @@ ROUTERS = [
     system_router,
     ollama_router,
     health_router,
+    ml_router,
 ]
 
 for r in ROUTERS:

@@ -91,6 +91,18 @@ backend/data/*
 !backend/data/.gitkeep
 
 # ---------------------------------------------------------
+# Datasets & Large Training Corpora (>100MB / Multi-GB)
+# ---------------------------------------------------------
+dataset/
+dataset/*
+*.pkl
+*.parquet
+*.h5
+*.hdf5
+*.feather
+*.arrow
+
+# ---------------------------------------------------------
 # Workspace, Sandboxes & Patch Backups
 # ---------------------------------------------------------
 *.bak

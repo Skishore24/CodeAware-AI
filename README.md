@@ -157,6 +157,15 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
+## 🧠 Machine Learning & Model Training
+
+CodeAware AI includes an offline code vulnerability detection classifier trained on real CVE fixes and production code:
+
+- **Quick CLI Training**: `uv run python train.py --samples 2000`
+- **Comprehensive Guide**: See [`ML_TRAINING_GUIDE.md`](file:///c:/MyFiles/Project/CODEAWARE/ML_TRAINING_GUIDE.md) for full pipeline architecture, CodeSearchNet integration, and hyperparameter tuning.
+
+---
+
 ## 🧪 Verification & Testing
 
 ### Run Backend Test Suite (33 Automated Tests)
